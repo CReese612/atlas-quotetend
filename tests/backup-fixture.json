@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "quotes": [
+    {
+      "estimate_id": "QT-1001",
+      "customer_name": "Mara Ellis",
+      "customer_email": "mara.ellis@example.com",
+      "job_description": "Exterior repaint · two-story home",
+      "amount_usd": 6800,
+      "estimate_date": "2026-08-29",
+      "status": "sent",
+      "next_follow_up_date": "2026-09-20",
+      "last_contact_date": "2026-09-16",
+      "do_not_contact": false,
+      "notes": "Warm white siding with sage trim. Asked about the prep process.",
+      "saved_draft": "Fictional restored draft: thanks for reviewing the colors.",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-08-29T12:00:00",
+          "text": "Fictional demo estimate added"
+        },
+        {
+          "type": "contact",
+          "at": "2026-09-16T12:18:16.764Z",
+          "date": "2026-09-16",
+          "text": "Phone contact recorded — Fictional backup round-trip test"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1002",
+      "customer_name": "Theo Bennett",
+      "customer_email": "theo.bennett@example.com",
+      "job_description": "Kitchen cabinet refinishing",
+      "amount_usd": 4250,
+      "estimate_date": "2026-09-04",
+      "status": "sent",
+      "next_follow_up_date": "2026-09-14",
+      "last_contact_date": "",
+      "do_not_contact": false,
+      "notes": "Considering a satin finish.",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-09-04T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1003",
+      "customer_name": "Nina Parker",
+      "customer_email": "nina.parker@example.com",
+      "job_description": "Living room & hallway refresh",
+      "amount_usd": 2350,
+      "estimate_date": "2026-09-08",
+      "status": "sent",
+      "next_follow_up_date": "2026-09-16",
+      "last_contact_date": "",
+      "do_not_contact": false,
+      "notes": "Walls and ceilings; customer will move furniture.",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-09-08T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1004",
+      "customer_name": "Owen Brooks",
+      "customer_email": "",
+      "job_description": "Deck staining & sealing",
+      "amount_usd": 1800,
+      "estimate_date": "2026-09-09",
+      "status": "sent",
+      "next_follow_up_date": "2026-09-16",
+      "last_contact_date": "",
+      "do_not_contact": false,
+      "notes": "No email on file. Use the demo phone conversation workflow.",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-09-09T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1005",
+      "customer_name": "Lena Foster",
+      "customer_email": "lena.foster@example.com",
+      "job_description": "Full interior · three-bedroom home",
+      "amount_usd": 9400,
+      "estimate_date": "2026-09-11",
+      "status": "sent",
+      "next_follow_up_date": "2026-09-18",
+      "last_contact_date": "",
+      "do_not_contact": false,
+      "notes": "Prefers low-odor paint.",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-09-11T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1006",
+      "customer_name": "Eli Sutton",
+      "customer_email": "eli.sutton@example.com",
+      "job_description": "Garage & workshop repaint",
+      "amount_usd": 3100,
+      "estimate_date": "2026-09-12",
+      "status": "sent",
+      "next_follow_up_date": "2026-09-20",
+      "last_contact_date": "",
+      "do_not_contact": false,
+      "notes": "Two colors, including a durable workshop finish.",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-09-12T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1007",
+      "customer_name": "Iris Lane",
+      "customer_email": "iris.lane@example.com",
+      "job_description": "Front door & entryway",
+      "amount_usd": 950,
+      "estimate_date": "2026-09-13",
+      "status": "draft",
+      "next_follow_up_date": "",
+      "last_contact_date": "",
+      "do_not_contact": false,
+      "notes": "Confirm final color before sharing the estimate.",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-09-13T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1008",
+      "customer_name": "Caleb Reed",
+      "customer_email": "caleb.reed@example.com",
+      "job_description": "Bedroom repaint",
+      "amount_usd": 1650,
+      "estimate_date": "2026-08-26",
+      "status": "won",
+      "next_follow_up_date": "",
+      "last_contact_date": "",
+      "do_not_contact": false,
+      "notes": "Customer accepted. Schedule agreed separately.",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-08-26T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1009",
+      "customer_name": "Ada Morgan",
+      "customer_email": "ada.morgan@example.com",
+      "job_description": "Exterior trim restoration",
+      "amount_usd": 5200,
+      "estimate_date": "2026-08-23",
+      "status": "won",
+      "next_follow_up_date": "",
+      "last_contact_date": "",
+      "do_not_contact": false,
+      "notes": "Accepted after discussing surface preparation.",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-08-23T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1010",
+      "customer_name": "Finn Avery",
+      "customer_email": "finn.avery@example.com",
+      "job_description": "Fence staining",
+      "amount_usd": 2200,
+      "estimate_date": "2026-08-27",
+      "status": "lost",
+      "next_follow_up_date": "",
+      "last_contact_date": "",
+      "do_not_contact": false,
+      "notes": "Customer decided to postpone the project.",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-08-27T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1011",
+      "customer_name": "June Rowan",
+      "customer_email": "june.rowan@example.com",
+      "job_description": "Home office repaint",
+      "amount_usd": 1450,
+      "estimate_date": "2026-09-01",
+      "status": "sent",
+      "next_follow_up_date": "",
+      "last_contact_date": "",
+      "do_not_contact": true,
+      "notes": "Customer requested no more follow-ups.",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-09-01T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    },
+    {
+      "estimate_id": "QT-1012",
+      "customer_name": "Maple House Studio",
+      "customer_email": "studio@example.com",
+      "job_description": "Commercial studio repaint",
+      "amount_usd": 28500,
+      "estimate_date": "2026-09-10",
+      "status": "sent",
+      "next_follow_up_date": "",
+      "last_contact_date": "",
+      "do_not_contact": false,
+      "notes": "Owner said, \"Let’s review the timeline, then the colors.\"",
+      "saved_draft": "",
+      "history": [
+        {
+          "type": "created",
+          "at": "2026-09-10T12:00:00",
+          "text": "Fictional demo estimate added"
+        }
+      ]
+    }
+  ]
+}

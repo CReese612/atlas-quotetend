@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Local databases
+*.sqlite
+*.sqlite-*
+
+# Test / generated output
+test-results/
+playwright-report/
+coverage/
+*.partial
+
+# Environment / secrets
+.env
+.env.*
+!.env.production.example
+
+# Backups
+backups/
+QuoteTend Backups/
+
+# Local research / scratch archives
+Notes/
+*Grok*/
+
+# Build output
+dist/
+build/
+.next/
+
+# Agent-local configuration
+.agentsroom/
+.claude/settings.local.json
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

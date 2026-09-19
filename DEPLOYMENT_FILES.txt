@@ -1,0 +1,28 @@
+# Source allowlist for the prepared service. No upload or Git connection is authorized yet.
+# Exclude local databases, backups, Notes, research, screenshots, node_modules and real secrets.
+package.json
+pnpm-lock.yaml
+render.yaml
+server.mjs
+production-config.mjs
+account-api.mjs
+account-store.mjs
+account-security.mjs
+ledger.mjs
+backups.mjs
+backup-accounts.mjs
+manage-accounts.mjs
+invite-owner.mjs
+index.html
+signin.html
+security.html
+app.js
+signin.js
+security.js
+account-client.js
+domain.js
+results.js
+results-view.js
+import-mapping.js
+styles.css
+favicon.svg

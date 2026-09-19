@@ -1,0 +1,5 @@
+estimate_id,customer_name,customer_email,job_description,amount_usd,estimate_date,status,next_follow_up_date,last_contact_date,do_not_contact,notes
+QA-2001,Casey Demo,casey@example.com,Fictional bedroom repaint,1500.50,2026-09-10,sent,2026-09-16,,false,"Customer said, ""sage, please."""
+QA-2001,Duplicate Demo,duplicate@example.com,Duplicate should skip,1500.50,2026-09-10,sent,2026-09-16,,false,Deliberate duplicate ID
+QA-2002,Invalid Demo,invalid@example.com,Invalid date should skip,1000,2026-02-30,sent,2026-09-16,,false,Deliberate invalid date
+QA-2003,Optout Demo,optout@example.com,Fictional office repaint,900,2026-09-10,sent,2026-09-16,,true,Opted out; follow-up should be cleared

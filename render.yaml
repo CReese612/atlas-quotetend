@@ -1,0 +1,34 @@
+# PREPARED ONLY. Creating this Blueprint provisions resources and requires owner approval.
+services:
+  - type: web
+    name: quotetend-pilot
+    runtime: node
+    region: ohio
+    plan: starter
+    numInstances: 1
+    autoDeployTrigger: off
+    buildCommand: npx --yes pnpm@10.14.0 install --frozen-lockfile --prod
+    startCommand: node server.mjs
+    healthCheckPath: /healthz
+    maxShutdownDelaySeconds: 60
+    disk:
+      name: quotetend-data
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: TZ
+        value: America/Chicago
+      - key: PUBLIC_ORIGIN
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: QUOTETEND_DB
+        value: /var/data/accounts.sqlite
+      - key: QUOTETEND_BACKUP_DIR
+        value: /var/data/backups
