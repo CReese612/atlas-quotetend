@@ -9,7 +9,8 @@
     "start:public": "node public-site/serve.mjs",
     "test": "node --test tests/*.test.mjs",
     "test:public": "node --test tests/public-site.test.mjs",
-    "test:browser": "node tests/browser-rehearsal.mjs"
+    "test:browser": "node tests/browser-rehearsal.mjs",
+    "test:public:browser": "node tests/public-site-browser.mjs"
   },
   "engines": {
     "node": ">=24.0.0"

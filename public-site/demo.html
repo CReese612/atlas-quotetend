@@ -1,1 +1,67 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QuoteTend | Interactive contractor demo</title><link rel="stylesheet" href="demo.css"><script type="module" src="demo.js"></script></head><body><header><a href="index.html" class="brand">Quote<span>Tend</span><i>.</i></a><p>INTERACTIVE DEMO · Fictional Northline Exterior Co. data</p><button id="reset">Reset demo</button></header><main><aside><b>Northline Exterior Co.</b><small>FICTIONAL WORKSPACE</small><button data-view="overview">Overview</button><button data-view="estimates">Estimates</button><button data-view="followups">Follow-ups <em id="due"></em></button><button data-view="reports">Reports</button><hr><button id="guide">Start guided tour</button><p>Browser-only demo<br>Nothing is sent.</p></aside><section id="app"></section></main><dialog id="detail"></dialog><div id="toast" role="status"></div></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interactive demo — QuoteTend</title>
+  <meta name="description" content="Explore QuoteTend with a fictional roofing and exteriors company: open estimates, follow-up queues, editable drafts, contact and outcome tracking, and reporting. No sign-up.">
+  <meta name="theme-color" content="#102b29">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Inter:wght@400..700&amp;display=swap">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/demo.css">
+  <script type="module" src="assets/js/demo.js"></script>
+</head>
+<body class="demo">
+  <a class="skip-link" href="#app-main">Skip to content</a>
+  <div class="app" data-app>
+    <aside class="app-side" id="app-nav" aria-label="Demo workspace">
+      <a class="app-brand" href="index.html" aria-label="QuoteTend website">
+        <svg class="qt-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8.5" fill="currentColor"/><path d="M20.4 20.9A8 8 0 1 1 22.9 13.4" fill="none" stroke="#F8F7F2" stroke-width="3" stroke-linecap="round"/><path d="M14.6 16.4l3.6 3.6 7-8.2" fill="none" stroke="#D9AE5F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>QuoteTend</span>
+      </a>
+      <div class="app-ws">
+        <span class="app-ws__mark" aria-hidden="true">FR</span>
+        <div><strong>Fernbrook Roofing &amp; Exteriors</strong><small>Fictional demo company</small></div>
+      </div>
+      <nav class="app-nav" aria-label="Demo sections">
+        <p class="app-label" aria-hidden="true">Workspace</p>
+        <ul data-nav-list></ul>
+      </nav>
+      <div class="app-side__foot">
+        <button class="app-side__btn" type="button" data-action="start-tour" data-icon="tour">Guided tour</button>
+        <button class="app-side__btn" type="button" data-action="reset" data-icon="reset">Reset demo data</button>
+        <a class="app-side__btn" href="index.html" data-icon="arrowLeft">Back to website</a>
+        <p class="app-side__note">All companies, people and figures are fictional. Changes stay in this browser. Nothing is ever sent.</p>
+      </div>
+    </aside>
+    <div class="app-scrim" data-nav-scrim hidden></div>
+
+    <div class="app-shell">
+      <header class="app-top">
+        <button class="app-menu" type="button" aria-controls="app-nav" aria-expanded="false" data-nav-toggle aria-label="Open navigation"></button>
+        <p class="app-crumb"><span>Fernbrook</span><span aria-hidden="true">/</span><strong data-crumb>Overview</strong></p>
+        <form class="app-search" role="search" data-global-search>
+          <label class="sr-only" for="global-search">Search estimates</label>
+          <input id="global-search" type="search" name="q" placeholder="Search customers, jobs, streets…" autocomplete="off">
+        </form>
+        <span class="app-pill"><i aria-hidden="true"></i>Fictional demo data</span>
+        <button class="app-tour-btn" type="button" data-action="start-tour">Guided tour</button>
+        <a class="app-cta" href="index.html#early-access">Early access</a>
+      </header>
+      <main id="app-main" class="app-main qt" tabindex="-1" data-main>
+        <noscript><p style="padding:40px">The interactive demo needs JavaScript. You can read about QuoteTend on the <a href="index.html">website</a>.</p></noscript>
+      </main>
+    </div>
+  </div>
+
+  <div class="drawer-scrim" data-drawer-scrim hidden></div>
+  <aside class="drawer qt" role="dialog" aria-labelledby="drawer-title" data-drawer hidden></aside>
+  <div class="tour-dock qt" data-tour-dock hidden></div>
+  <dialog class="confirm qt" data-confirm aria-labelledby="confirm-title" aria-describedby="confirm-body"></dialog>
+  <div class="toast" role="status" aria-live="polite" data-toast></div>
+</body>
+</html>
