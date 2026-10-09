@@ -19,6 +19,7 @@
   --sand: #e7e3d6;
   --white: #ffffff;
   --gold-700: #85601d;
+  --gold-600: #a87a2c;
   --gold-500: #c99a4b;
   --gold-400: #d9ae5f;
   --gold-200: #efdcb3;
@@ -111,6 +112,13 @@ p { margin: 0; }
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* Brand wordmark "ꝘuoteTend": vector Ꝙ (components.js Q_GLYPH) followed by live display text. */
+.wordmark { display: inline-flex; align-items: baseline; font-family: var(--font-display); font-weight: 700; letter-spacing: -0.035em; line-height: 1; white-space: nowrap; color: var(--ink); --stroke: var(--gold-600); }
+.wordmark__q { width: 0.87em; height: 0.95em; margin-right: -0.035em; position: relative; top: 0.24em; flex: none; overflow: visible; }
+.wordmark__stroke { stroke: var(--stroke); }
+.wordmark::after { content: "uoteTend"; }
+.wordmark--on-dark { color: var(--ivory); --stroke: var(--gold-400); }
 
 /* Buttons shared by website and demo chrome */
 .btn {

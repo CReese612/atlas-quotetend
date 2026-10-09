@@ -1,6 +1,7 @@
 // QuoteTend public website. Static by design: no private APIs, accounts or analytics.
 // Product visuals are rendered from the same components and fictional records as the demo.
 import { SITE_CONFIG } from './site-config.js';
+import { resolveContactConfig, mountEarlyAccess } from './early-access.js';
 import { COMPANY, createWorkspace, todayISO, addDays, metrics, queues, pipelineByState, filterEstimates, recordContact, resultsForRange,
   previewImport, sampleImportCSV, statusTotals, TRADES } from './workspace.js';
 import { esc, money, moneyShort, icon, kpi, attentionRow, stateBar, estimateTable, queueRow, draftPanel, contactForm, timeline,
@@ -192,80 +193,8 @@ function updateCalc() {
 calcInputs.forEach(i => i.addEventListener('input', updateCalc)); if (calcInputs.length) updateCalc();
 
 // ---------- Early access ----------
-const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) || location.hostname.endsWith('.localhost') || location.protocol === 'file:';
-const validEmail = s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
-const config = {
-  // Reserved documentation and placeholder domains are never published as a contact.
-  email: validEmail(SITE_CONFIG.contactEmail || '') && !/@(example\.(com|org|net)|[^@]*\.(example|test|invalid|localhost))$/i.test(SITE_CONFIG.contactEmail) ? SITE_CONFIG.contactEmail : '',
-  booking: /^https:\/\//.test(SITE_CONFIG.bookingUrl || '') ? SITE_CONFIG.bookingUrl : '',
-  endpoint: /^https:\/\//.test(SITE_CONFIG.formEndpoint || '') ? SITE_CONFIG.formEndpoint : ''
-};
-
-function renderEarlyAccess() {
-  const slot = $('[data-early-pending]');
-  if (!slot) return;
-  const bookingLink = config.booking ? `<a class="btn" href="${esc(config.booking)}" target="_blank" rel="noopener">Book a walkthrough call ${icon('external')}</a>` : '';
-  if (!config.endpoint && !config.email) {
-    $('[data-early] h3').textContent = config.booking ? 'Book a walkthrough' : 'Early-access requests open soon';
-    $('[data-early] > p').textContent = config.booking
-      ? 'Pick a time for a short call about how your team handles estimates today and whether QuoteTend fits.'
-      : 'Requests aren’t being taken on this site yet. In the meantime, the interactive demo shows exactly how QuoteTend works today.';
-    slot.innerHTML = `
-      <div class="form-actions">${config.booking ? bookingLink.replace('class="btn"', 'class="btn btn--primary"') : ''}<a class="btn ${config.booking ? '' : 'btn--primary'}" href="demo.html?tour=1">Start the guided tour ${icon('arrowRight')}</a></div>
-      ${isLocal && !config.booking ? `<p class="config-hint"><strong>Preview note (local only):</strong> no contact channel is configured. Set <code>contactEmail</code>, <code>formEndpoint</code> or <code>bookingUrl</code> in <code>assets/js/site-config.js</code> to enable requests.</p>` : ''}`;
-    if (isLocal && !config.booking) console.warn('QuoteTend: early-access contact is not configured (assets/js/site-config.js).');
-    return;
-  }
-  slot.innerHTML = `<form class="form" data-early-form novalidate>
-      <label class="field">Your name<input name="name" autocomplete="name" required maxlength="120"></label>
-      <label class="field">Company<input name="company" autocomplete="organization" required maxlength="160"></label>
-      <label class="field">Work email<input name="email" type="email" autocomplete="email" required maxlength="200"></label>
-      <label class="field">Phone <span class="opt">optional</span><input name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
-      <label class="field">Main trade<select name="trade" required><option value="">Choose one</option>${['Roofing', 'Siding', 'Windows & doors', 'Exterior remodeling', 'Other'].map(t => `<option>${esc(t)}</option>`).join('')}</select></label>
-      <label class="field">Estimates per month<select name="volume"><option value="">Choose a range</option><option>Fewer than 10</option><option>10–30</option><option>30–75</option><option>More than 75</option></select></label>
-      <label class="field full">Where do your estimates live today? <span class="opt">optional</span><textarea name="message" maxlength="2000" placeholder="For example: a spreadsheet, an estimating app, paper folders…"></textarea></label>
-      <p class="form-status" data-form-status role="status"></p>
-      <div class="form-actions"><button class="btn btn--primary" type="submit">${config.endpoint ? 'Request early access' : 'Write the request in my email app'} ${icon('arrowRight')}</button>
-        <span class="form-privacy">${config.endpoint ? 'We only use this to reply to your request.' : 'Opens your email app with your answers filled in. Nothing is sent until you press Send there.'}</span></div>
-    </form>
-    ${config.email || config.booking ? `<div class="contact-alt">${config.email ? `<span>Prefer email? <a href="mailto:${esc(config.email)}">${esc(config.email)}</a></span>` : ''}${bookingLink}</div>` : ''}`;
-  const form = $('[data-early-form]');
-  form.addEventListener('submit', submitEarlyAccess);
-}
-
-async function submitEarlyAccess(event) {
-  event.preventDefault();
-  const form = event.currentTarget, status = $('[data-form-status]', form), button = $('button[type="submit"]', form);
-  const data = Object.fromEntries(new FormData(form).entries());
-  const missing = ['name', 'company', 'email', 'trade'].filter(k => !String(data[k] || '').trim());
-  for (const el of $$('input, select', form)) el.removeAttribute('aria-invalid');
-  if (missing.length || !validEmail(data.email || '')) {
-    const bad = missing.length ? missing : ['email'];
-    bad.forEach(k => form.elements[k]?.setAttribute('aria-invalid', 'true'));
-    status.className = 'form-status form-status--error';
-    status.textContent = missing.length ? 'Please fill in your name, company, work email and main trade.' : 'Please enter a valid email address.';
-    form.elements[bad[0]]?.focus();
-    return;
-  }
-  if (config.endpoint) {
-    button.disabled = true; status.className = 'form-status form-status--warn'; status.textContent = 'Sending your request…';
-    try {
-      const res = await fetch(config.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ ...data, source: 'quotetend-website' }) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      status.className = 'form-status form-status--ok';
-      status.textContent = `Thanks, ${data.name.split(' ')[0]} — your request was received. We’ll reply to ${data.email}.`;
-      form.reset();
-    } catch {
-      status.className = 'form-status form-status--error';
-      status.textContent = `Your request could not be sent. Nothing was submitted — please try again${config.email ? ` or email ${config.email}` : ''}.`;
-    } finally { button.disabled = false; }
-    return;
-  }
-  const body = [`Name: ${data.name}`, `Company: ${data.company}`, `Email: ${data.email}`, data.phone && `Phone: ${data.phone}`, `Main trade: ${data.trade}`,
-    data.volume && `Estimates per month: ${data.volume}`, data.message && `\nWhere our estimates live today:\n${data.message}`].filter(Boolean).join('\n');
-  location.href = `mailto:${config.email}?subject=${encodeURIComponent(`QuoteTend early access — ${data.company}`)}&body=${encodeURIComponent(body)}`;
-  status.className = 'form-status form-status--warn';
-  status.textContent = `Your email app should open with this request filled in. It has not been sent yet — press Send in your email app to deliver it to ${config.email}.`;
-}
-renderEarlyAccess();
-if (config.email) $('[data-footer-contact]')?.insertAdjacentHTML('beforeend', `<li><a href="mailto:${esc(config.email)}">Contact</a></li>`);
+const contact = resolveContactConfig(SITE_CONFIG, location);
+const earlyCard = $('[data-early]');
+if (earlyCard) mountEarlyAccess(earlyCard, contact);
+if (contact.mode === 'preview') console.warn('QuoteTend: early-access form is not connected (set formEndpoint in assets/js/site-config.js).');
+if (contact.email) $('[data-footer-contact]')?.insertAdjacentHTML('beforeend', `<li><a href="mailto:${esc(contact.email)}">Contact</a></li>`);

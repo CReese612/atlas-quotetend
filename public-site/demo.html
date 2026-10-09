@@ -6,7 +6,10 @@
   <title>Interactive demo — QuoteTend</title>
   <meta name="description" content="Explore QuoteTend with a fictional roofing and exteriors company: open estimates, follow-up queues, editable drafts, contact and outcome tracking, and reporting. No sign-up.">
   <meta name="theme-color" content="#102b29">
+  <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Inter:wght@400..700&amp;display=swap">
@@ -20,8 +23,7 @@
   <div class="app" data-app>
     <aside class="app-side" id="app-nav" aria-label="Demo workspace">
       <a class="app-brand" href="index.html" aria-label="QuoteTend website">
-        <svg class="qt-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8.5" fill="currentColor"/><path d="M20.4 20.9A8 8 0 1 1 22.9 13.4" fill="none" stroke="#F8F7F2" stroke-width="3" stroke-linecap="round"/><path d="M14.6 16.4l3.6 3.6 7-8.2" fill="none" stroke="#D9AE5F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>QuoteTend</span>
+        <span class="wordmark wordmark--on-dark" aria-hidden="true"><svg class="wordmark__q" viewBox="0 -1 87 95" width="18" height="19" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M32 -1C50 -1 62 13.4 62 35C62 56.6 50 71 32 71C14 71 2 56.6 2 35C2 13.4 14 -1 32 -1ZM32 9.4C42.2 9.4 49 19.64 49 35C49 50.36 42.2 60.6 32 60.6C21.8 60.6 15 50.36 15 35C15 19.64 21.8 9.4 32 9.4Z"/><path fill="currentColor" d="M44.6 58.6L52.4 51.6L69 76.2L61.2 83.2Z"/><path class="wordmark__stroke" fill="none" stroke-width="10" stroke-linecap="round" d="M66 24C71 18.5 80.5 19.5 80.5 28C80.5 32.5 78.5 36.5 76 40.5L53 86"/></svg></span><span class="sr-only">QuoteTend</span>
       </a>
       <div class="app-ws">
         <span class="app-ws__mark" aria-hidden="true">FR</span>
@@ -35,7 +37,7 @@
         <button class="app-side__btn" type="button" data-action="start-tour" data-icon="tour">Guided tour</button>
         <button class="app-side__btn" type="button" data-action="reset" data-icon="reset">Reset demo data</button>
         <a class="app-side__btn" href="index.html" data-icon="arrowLeft">Back to website</a>
-        <p class="app-side__note">All companies, people and figures are fictional. Changes stay in this browser. Nothing is ever sent.</p>
+        <p class="app-side__note">All companies, people and figures are fictional. Changes stay in this browser. Nothing is ever sent. Trade tags, street and phone details, and some charts preview planned customer-app features.</p>
       </div>
     </aside>
     <div class="app-scrim" data-nav-scrim hidden></div>

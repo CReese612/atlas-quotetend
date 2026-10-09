@@ -9,7 +9,10 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="QuoteTend — Your next job might already be in your estimates">
   <meta property="og:description" content="Organize outstanding estimates, prioritize follow-ups and record outcomes. Try the interactive contractor demo — no sign-up.">
+  <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Inter:wght@400..700&amp;display=swap">
@@ -24,8 +27,7 @@
   <header class="site-header" data-header>
     <div class="wrap header-inner">
       <a class="brand" href="./" aria-label="QuoteTend home">
-        <svg class="qt-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8.5" fill="currentColor"/><path d="M20.4 20.9A8 8 0 1 1 22.9 13.4" fill="none" stroke="#F8F7F2" stroke-width="3" stroke-linecap="round"/><path d="M14.6 16.4l3.6 3.6 7-8.2" fill="none" stroke="#D9AE5F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>QuoteTend</span>
+        <span class="wordmark" aria-hidden="true"><svg class="wordmark__q" viewBox="0 -1 87 95" width="18" height="19" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M32 -1C50 -1 62 13.4 62 35C62 56.6 50 71 32 71C14 71 2 56.6 2 35C2 13.4 14 -1 32 -1ZM32 9.4C42.2 9.4 49 19.64 49 35C49 50.36 42.2 60.6 32 60.6C21.8 60.6 15 50.36 15 35C15 19.64 21.8 9.4 32 9.4Z"/><path fill="currentColor" d="M44.6 58.6L52.4 51.6L69 76.2L61.2 83.2Z"/><path class="wordmark__stroke" fill="none" stroke-width="10" stroke-linecap="round" d="M66 24C71 18.5 80.5 19.5 80.5 28C80.5 32.5 78.5 36.5 76 40.5L53 86"/></svg></span><span class="sr-only">QuoteTend</span>
       </a>
       <nav class="nav" aria-label="Primary">
         <ul class="nav-links">
@@ -70,7 +72,7 @@
           <p class="lede">Stop losing track of opportunities. QuoteTend keeps every outstanding estimate in one place, shows exactly who needs a follow-up today, and helps your team turn more conversations into signed jobs.</p>
           <div class="hero-actions">
             <a class="btn btn--primary btn--lg" href="demo.html">Explore the interactive demo <svg class="qt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-            <a class="btn btn--lg" href="#how">See how it works</a>
+            <a class="btn btn--lg" href="#early-access">Get early access</a>
           </div>
           <ul class="hero-proof">
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Try the full demo in your browser — no sign-up</li>
@@ -153,12 +155,12 @@
               <div>
                 <p class="feature-num"><b>01</b>Estimate visibility</p>
                 <h3 id="f1-title">See every open estimate — and what it’s worth.</h3>
-                <p>Search by customer, street or job. Filter by status, trade or follow-up urgency. Totals update as you filter, so you always know the value in front of you.</p>
+                <p>Find any estimate by customer, job, estimate ID or email, filter by status, and see the open pipeline value at a glance.</p>
               </div>
               <ul class="points">
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Search across customers, jobs, streets and estimate IDs</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Filter by status, trade and follow-up state</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Open pipeline totals that always match your records</li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Search across customers, jobs, estimate IDs and emails</li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Filter by draft, sent, won, lost or do-not-contact</li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Open pipeline and won totals calculated from your records</li>
               </ul>
             </div>
             <div class="frame frame--sage feature-visual"><div class="shot shot--feature" data-shot="estimates" aria-hidden="true"></div></div>
@@ -171,7 +173,7 @@
               <p>Overdue, due today, upcoming and estimates that still need a date — sorted so the oldest promise rises to the top. Won, lost, draft and opted-out estimates stay out of the way.</p>
               <ul class="points">
                 <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Due &amp; overdue, Upcoming and Needs a date queues</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Days overdue, value and last contact at a glance</li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Days overdue and estimate value at a glance</li>
                 <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Customers who opt out leave every queue automatically</li>
               </ul>
             </div>
@@ -197,7 +199,7 @@
             <div class="feature-copy">
               <p class="feature-num"><b>04</b>Contact &amp; outcome tracking</p>
               <h3 id="f4-title">A clear record of every conversation and decision.</h3>
-              <p>Log the call, text or email that happened, set the next check-in, and record won or lost when the homeowner decides. The full history stays with the estimate.</p>
+              <p>Log the call, text or email that happened, set the next check-in, and record won or lost when the homeowner decides. The activity history stays with the estimate.</p>
               <ul class="points">
                 <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Contact date, method, note and next follow-up in one step</li>
                 <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Won and lost outcomes clear the follow-up and keep the history</li>
@@ -249,7 +251,7 @@
             <li class="step reveal">
               <span class="step-num" aria-hidden="true">2</span>
               <h3>Prioritize</h3>
-              <p>Sent estimates sort into overdue, due today, upcoming and needs a date — each with its dollar value.</p>
+              <p>Sent estimates sort into due &amp; overdue, upcoming and needs a date, oldest promise first.</p>
               <div class="step-ui" data-mini="prioritize" aria-hidden="true"></div>
             </li>
             <li class="step reveal">
@@ -293,6 +295,7 @@
             <a class="btn btn--lg" href="demo.html">Explore on your own</a>
           </div>
           <p class="showcase-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.4 2.4 4.8-5"/></svg>Runs in your browser. No sign-up, nothing is sent, and you can reset it anytime.</p>
+          <p class="showcase-fine">The demo also previews a few conveniences planned for the customer app, such as trade tags, street and phone details, and extra charts.</p>
         </div>
         <figure class="reveal" style="margin:0">
           <div class="shot shot--showcase" data-shot="showcase" aria-hidden="true"></div>
@@ -307,21 +310,21 @@
         <div class="section-head section-head--center reveal">
           <p class="eyebrow">Straight answers</p>
           <h2 id="truth-title">What’s available today — and what isn’t yet.</h2>
-          <p class="lede">QuoteTend is in early access. We’d rather you know exactly what you’re getting.</p>
+          <p class="lede">QuoteTend is getting ready for early access. We’d rather you know exactly what you’re getting.</p>
         </div>
         <div class="truth">
           <article class="truth-card truth-card--now reveal">
             <h3>Available today <span class="badge">Built</span></h3>
             <p>The core estimate follow-up workflow, end to end.</p>
             <ul class="truth-list" data-truth="now">
-              <li>Estimate tracking with search and filters</li>
+              <li>Estimate tracking with search and status filters</li>
               <li>Follow-up queues: due &amp; overdue, upcoming, needs a date</li>
               <li>Editable follow-up drafts you copy and send yourself</li>
               <li>Contact logging with next follow-up dates</li>
-              <li>Won, lost and do-not-contact outcomes with full history</li>
+              <li>Won, lost and do-not-contact outcomes with activity history</li>
               <li>CSV import with column matching and row-by-row preview</li>
               <li>Follow-up Results reporting on recorded activity</li>
-              <li>CSV export and full backups</li>
+              <li>CSV export and workspace backups</li>
             </ul>
           </article>
           <article class="truth-card truth-card--next reveal">
@@ -353,16 +356,16 @@
           <div class="reveal">
             <p class="eyebrow eyebrow--light">Early access</p>
             <h2 id="early-title">Bring us your open estimates. We’ll help you set up the follow&#8209;up.</h2>
-            <p class="lede">QuoteTend is opening to a small group of roofing, siding and window contractors, with hands-on, assisted setup.</p>
+            <p class="lede">We’re preparing a limited early-access program for roofing, siding and window contractors, with hands-on, assisted setup.</p>
             <ul class="includes">
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>A walkthrough of how your team follows up on estimates today</li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Help importing open estimates from your spreadsheet or estimating-tool export</li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>A direct line to the people building QuoteTend</li>
             </ul>
           </div>
-          <div class="early-card reveal" data-early aria-live="polite">
+          <div class="early-card reveal" data-early>
             <h3>Request early access</h3>
-            <p>Tell us a little about your business.</p>
+            <p>Tell us a little about your business and we’ll be in touch about early access.</p>
             <div class="pending" data-early-pending>
               <noscript><p>Early-access requests need JavaScript enabled. You can still explore the <a href="demo.html">interactive demo</a>.</p></noscript>
             </div>
@@ -399,7 +402,7 @@
           </details>
           <details class="faq-item">
             <summary>How will onboarding work?<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></span></summary>
-            <div class="answer"><p>Setup is assisted. We start with a conversation about how your team handles estimates today. Then we help you export your open estimates, match the columns, and set follow-up dates, so your queue reflects real work from the start.</p><p>Before you import any real customer information, we’ll walk through where your data is stored and how it’s backed up.</p></div>
+            <div class="answer"><p>Early-access setup will be assisted. We’ll start with a conversation about how your team handles estimates today. Then we’ll help you export your open estimates, match the columns, and set follow-up dates, so your queue reflects real work from the start.</p><p>Before you import any real customer information, we’ll walk through where your data is stored and how it’s backed up.</p></div>
           </details>
           <details class="faq-item">
             <summary>Is QuoteTend available for early customers?<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></span></summary>
@@ -419,8 +422,7 @@
       <div class="footer-grid">
         <div>
           <a class="brand" href="./" aria-label="QuoteTend home">
-            <svg class="qt-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8.5" fill="currentColor"/><path d="M20.4 20.9A8 8 0 1 1 22.9 13.4" fill="none" stroke="#F8F7F2" stroke-width="3" stroke-linecap="round"/><path d="M14.6 16.4l3.6 3.6 7-8.2" fill="none" stroke="#D9AE5F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>QuoteTend</span>
+            <span class="wordmark wordmark--on-dark" aria-hidden="true"><svg class="wordmark__q" viewBox="0 -1 87 95" width="18" height="19" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M32 -1C50 -1 62 13.4 62 35C62 56.6 50 71 32 71C14 71 2 56.6 2 35C2 13.4 14 -1 32 -1ZM32 9.4C42.2 9.4 49 19.64 49 35C49 50.36 42.2 60.6 32 60.6C21.8 60.6 15 50.36 15 35C15 19.64 21.8 9.4 32 9.4Z"/><path fill="currentColor" d="M44.6 58.6L52.4 51.6L69 76.2L61.2 83.2Z"/><path class="wordmark__stroke" fill="none" stroke-width="10" stroke-linecap="round" d="M66 24C71 18.5 80.5 19.5 80.5 28C80.5 32.5 78.5 36.5 76 40.5L53 86"/></svg></span><span class="sr-only">QuoteTend</span>
           </a>
           <p class="footer-tag">Estimate follow-up for roofing, siding and window contractors. Your next job might already be in your estimates.</p>
         </div>
@@ -442,7 +444,7 @@
         </div>
       </div>
       <div class="footer-base">
-        <span>© <span data-year>2026</span> QuoteTend. Product in early access.</span>
+        <span>© <span data-year>2026</span> QuoteTend. Preparing for early access.</span>
         <span>All demo companies, people and figures are fictional.</span>
       </div>
     </div>

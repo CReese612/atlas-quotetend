@@ -309,8 +309,7 @@
 
 /* Static preview chrome (homepage visuals) */
 .qt-side { background: var(--evergreen-900); color: #cfe0d4; padding: 1.2em 0.85em; display: flex; flex-direction: column; gap: 1.1em; }
-.qt-side__brand { display: flex; align-items: center; gap: 0.55em; color: var(--ivory); font-family: var(--font-display); font-weight: 700; font-size: 1.15em; letter-spacing: -0.02em; padding: 0 0.35em; }
-.qt-side__brand .qt-mark { width: 1.6em; height: 1.6em; color: var(--evergreen-600); }
+.qt-side__brand { display: flex; align-items: center; font-size: 1.4em; padding: 0.1em 0.35em 0.25em; }
 .qt-side__ws { display: flex; gap: 0.6em; align-items: center; padding: 0.6em; border-radius: 0.65em; background: rgb(255 255 255 / 0.06); border: 1px solid rgb(255 255 255 / 0.08); }
 .qt-side__ws-mark { display: grid; place-items: center; width: 2.1em; height: 2.1em; border-radius: 0.5em; background: var(--gold-400); color: var(--evergreen-950); font-weight: 750; font-size: 0.8em; flex: none; }
 .qt-side__ws strong { display: block; font-size: 0.75em; color: var(--ivory); line-height: 1.25; }
@@ -386,3 +385,5 @@
   .cards-at-narrow .qt-table td[data-label="Last contact"], .cards-at-narrow .qt-table td.qt-go { display: none; }
   .cards-at-narrow .qt-job { white-space: normal; }
 }
+.qt-tour--paused .qt-tour__step { color: #c3d6ca; }
+.qt-tour--paused .qt-tour__progress span { background: rgb(217 174 95 / 0.45); }

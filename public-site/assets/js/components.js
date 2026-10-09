@@ -65,7 +65,19 @@ const ICONS = {
 export function icon(name, cls = '') {
   return `<svg class="qt-icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONS[name] || ICONS.info}</svg>`;
 }
-export const brandMark = (cls = '') => `<svg class="qt-mark ${cls}" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8.5" fill="currentColor"/><path d="M20.4 20.9A8 8 0 1 1 22.9 13.4" fill="none" stroke="#F8F7F2" stroke-width="3" stroke-linecap="round"/><path d="M14.6 16.4l3.6 3.6 7-8.2" fill="none" stroke="#D9AE5F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+// ---------- Brand ----------
+// Visual wordmark "ꝘuoteTend". Bricolage Grotesque and Inter do not contain U+A758 (Ꝙ), and a
+// system-font fallback looks noticeably different, so the Ꝙ is drawn as vector paths sized to the
+// display face (1 unit = 0.01em, cap height 70, baseline y=70). Everything else stays live text,
+// and the accessible name is always the ordinary spelling "QuoteTend".
+export const Q_GLYPH = Object.freeze({
+  viewBox: '0 -1 87 95',
+  bowl: 'M32 -1C50 -1 62 13.4 62 35C62 56.6 50 71 32 71C14 71 2 56.6 2 35C2 13.4 14 -1 32 -1ZM32 9.4C42.2 9.4 49 19.64 49 35C49 50.36 42.2 60.6 32 60.6C21.8 60.6 15 50.36 15 35C15 19.64 21.8 9.4 32 9.4Z',
+  tail: 'M44.6 58.6L52.4 51.6L69 76.2L61.2 83.2Z',
+  stroke: 'M66 24C71 18.5 80.5 19.5 80.5 28C80.5 32.5 78.5 36.5 76 40.5L53 86'
+});
+const qGlyphSvg = cls => `<svg class="${cls}" viewBox="${Q_GLYPH.viewBox}" width="18" height="19" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="${Q_GLYPH.bowl}"/><path fill="currentColor" d="${Q_GLYPH.tail}"/><path class="wordmark__stroke" fill="none" stroke-width="10" stroke-linecap="round" d="${Q_GLYPH.stroke}"/></svg>`;
+export const wordmark = (cls = '') => `<span class="wordmark ${cls}" aria-hidden="true">${qGlyphSvg('wordmark__q')}</span><span class="sr-only">QuoteTend</span>`;
 
 // ---------- Status and timing ----------
 const STATUS_LABEL = { draft: 'Draft', sent: 'Sent', won: 'Won', lost: 'Lost' };
@@ -267,5 +279,5 @@ export function importRows(preview) {
 // ---------- App chrome for static previews ----------
 export function previewSidebar(active, counts) {
   const items = [['overview', 'Overview'], ['estimates', 'Estimates', counts.estimates], ['followups', 'Follow-ups', counts.due], ['results', 'Follow-up Results'], ['import', 'Import']];
-  return `<aside class="qt-side"><div class="qt-side__brand">${brandMark()}<span>QuoteTend</span></div><div class="qt-side__ws"><span class="qt-side__ws-mark">${COMPANY.initials}</span><div><strong>${esc(COMPANY.name)}</strong><small>Fictional demo workspace</small></div></div><nav class="qt-side__nav" aria-label="Preview navigation">${items.map(([k, label, n]) => `<span class="qt-nav ${k === active ? 'is-active' : ''}">${icon(k)}<span>${label}</span>${n ? `<em>${n}</em>` : ''}</span>`).join('')}</nav></aside>`;
+  return `<aside class="qt-side"><div class="qt-side__brand">${wordmark('wordmark--on-dark')}</div><div class="qt-side__ws"><span class="qt-side__ws-mark">${COMPANY.initials}</span><div><strong>${esc(COMPANY.name)}</strong><small>Fictional demo workspace</small></div></div><nav class="qt-side__nav" aria-label="Preview navigation">${items.map(([k, label, n]) => `<span class="qt-nav ${k === active ? 'is-active' : ''}">${icon(k)}<span>${label}</span>${n ? `<em>${n}</em>` : ''}</span>`).join('')}</nav></aside>`;
 }

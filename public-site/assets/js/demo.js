@@ -228,6 +228,8 @@ function renderDrawer() {
 function openDrawer(id, { focus = true, trigger = document.activeElement } = {}) {
   if (ui.drawer !== id) ui.draftStatus = '';
   ui.drawer = id;
+  // Opening the featured estimate from tour step 2 is exactly what step 3 asks for, so advance.
+  if (ui.tour === 1 && id === FOCUS_ID) { ui.tour = 2; ui.scrolledStep = null; persistTour(); }
   lastTrigger = trigger;
   renderDrawer();
   drawer.hidden = false; scrim.hidden = false;
@@ -235,7 +237,7 @@ function openDrawer(id, { focus = true, trigger = document.activeElement } = {})
   document.body.classList.add('drawer-open');
   closeNav();
   if (focus) $('#drawer-title', drawer)?.focus();
-  updateHighlight();
+  renderTour();
 }
 
 function closeDrawer({ restoreFocus = true } = {}) {
@@ -245,6 +247,7 @@ function closeDrawer({ restoreFocus = true } = {}) {
   drawer.hidden = true; scrim.hidden = true; drawer.innerHTML = '';
   app.inert = false;
   document.body.classList.remove('drawer-open');
+  renderTour();
   if (restoreFocus) (lastTrigger?.isConnected ? lastTrigger : $(`[data-open="${CSS.escape(id)}"]`, main) || $('h1', main))?.focus();
 }
 
@@ -363,11 +366,36 @@ function persistTour() {
   else session.set(TOUR_KEY, JSON.stringify({ index: ui.tour, min: ui.tourMin, loggedExample: ui.loggedExample }));
 }
 
+// Each step expects a specific screen. When the workspace no longer matches (the visitor used the
+// navigation, closed the record or switched queue tabs), the card pauses instead of describing a
+// screen that is not visible, and offers to resume.
+const QUEUE_LABELS = { due: 'Due & overdue', upcoming: 'Upcoming', unscheduled: 'Needs a date' };
+function tourExpectation() {
+  const step = STEPS[ui.tour ?? -1];
+  if (!step) return null;
+  return { view: step.view, drawer: step.drawer || null, queue: step.view === 'followups' && !step.drawer ? queueFor(FOCUS_ID) : null };
+}
+function tourInSync() {
+  const e = tourExpectation();
+  if (!e) return true;
+  return ui.view === e.view && (ui.drawer || null) === e.drawer && (!e.queue || ui.queue === e.queue);
+}
+function screenLabel({ view, drawer: id, queue }) {
+  if (id) return `${state.quotes.find(q => q.estimate_id === id)?.customer_name || 'an estimate'}’s estimate`;
+  if (view === 'followups' && queue) return `the ${QUEUE_LABELS[queue]} tab of Follow-ups`;
+  return view === 'overview' ? 'the Overview' : VIEWS[view];
+}
+
 function renderTour() {
   document.body.classList.toggle('tour-on', ui.tour !== null);
   if (ui.tour === null) { dock.hidden = true; dock.innerHTML = ''; clearHighlight(); return; }
+  const expected = tourExpectation();
+  const paused = expected && !tourInSync()
+    ? { here: screenLabel({ view: ui.view, drawer: ui.drawer, queue: ui.view === 'followups' && expected.queue ? ui.queue : null }), there: screenLabel(expected) }
+    : null;
   dock.hidden = false;
-  dock.innerHTML = tourCard(ui.tour, tourContext(state, today, { loggedExample: ui.loggedExample }), { minimized: ui.tourMin });
+  dock.dataset.state = paused ? 'paused' : 'active';
+  dock.innerHTML = tourCard(ui.tour, tourContext(state, today, { loggedExample: ui.loggedExample, range: ui.range }), { minimized: ui.tourMin, paused });
   document.documentElement.style.setProperty('--dock-h', `${dock.offsetHeight + 16}px`);
   updateHighlight();
 }
@@ -376,7 +404,7 @@ function clearHighlight() { $$('.tour-target').forEach(el => el.classList.remove
 function updateHighlight() {
   clearHighlight();
   const step = STEPS[ui.tour ?? -1];
-  if (!step) return;
+  if (!step || !tourInSync()) return;
   const target = (ui.drawer && $(step.target, drawer)) || $(step.target, main);
   if (!target) return;
   target.classList.add('tour-target');
@@ -427,6 +455,7 @@ async function tourAction(act) {
       return $('[data-tour-act="minimize"]', dock)?.focus();
     }
     case 'open-focus': ui.tour = 2; return applyTourStep();
+    case 'resume': ui.scrolledStep = null; return applyTourStep();
     case 'copy-draft': return copyDraft();
     case 'log-example': {
       const values = { date: today, channel: 'Phone', nextDate: addDays(today, 3), note: 'Example call: discussed the ice & water shield upgrade; deciding this week' };

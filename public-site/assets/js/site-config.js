@@ -1,15 +1,19 @@
-// Public contact configuration for early-access requests.
+// Public contact configuration for the early-access form. Everything here ships to visitors'
+// browsers, so it must never contain a secret. Setup and live-test steps: docs/PUBLIC_SITE.md.
 //
-// Leave a value empty until it is verified and actually monitored. The website adapts:
-//   formEndpoint set  -> the form POSTs to it and only reports success on a 2xx response.
-//   contactEmail set  -> the form opens the visitor's email app with the request filled in;
-//                        the page states plainly that nothing is sent until they press Send.
-//   bookingUrl set    -> a "Book a walkthrough" link is shown.
-//   nothing set       -> no form is shown and no contact address is displayed.
+//   formEndpoint     HTTPS URL of the provider-hosted form that receives requests as JSON POSTs.
+//                    QuoteTend's Formspree form. The form ID is public by design (it appears in
+//                    every submission request) and grants no account access.
+//   formExtraFields  Optional public (non-secret) fields a provider requires in every submission.
+//   bookingUrl       Optional HTTPS scheduling page. Adds a "Book a Demo" button.
+//   contactEmail     Optional monitored inbox shown as a "Prefer email?" link. Formspree delivers
+//                    notifications to the inbox set in the Formspree dashboard, not this value.
 //
-// The site never claims an inquiry was delivered unless formEndpoint confirmed it.
+// Success is shown only after the form service confirms acceptance. With formEndpoint empty, public
+// visitors see an honest "requests open soon" message and localhost shows a non-sending preview.
 export const SITE_CONFIG = Object.freeze({
-  contactEmail: '',
+  formEndpoint: 'https://formspree.io/f/xbgdylzd',
+  formExtraFields: Object.freeze({}),
   bookingUrl: '',
-  formEndpoint: ''
+  contactEmail: ''
 });
