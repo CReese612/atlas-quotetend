@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="assets/css/site.css">
   <script type="module" src="assets/js/site.js"></script>
 </head>
-<body class="site">
+<body class="site" data-page="home">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <header class="site-header" data-header>
@@ -31,15 +31,14 @@
       </a>
       <nav class="nav" aria-label="Primary">
         <ul class="nav-links">
-          <li><a href="#product">Product</a></li>
-          <li><a href="#how">How it works</a></li>
-          <li><a href="#demo">Interactive demo</a></li>
-          <li><a href="#faq">FAQ</a></li>
+          <li><a href="how-it-works.html">How it works</a></li>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="demo.html">Demo</a></li>
+          <li><a href="faq.html">FAQ</a></li>
         </ul>
       </nav>
       <div class="header-cta">
-        <a class="header-link" href="#early-access">Early access</a>
-        <a class="btn btn--primary btn--sm" href="demo.html">Explore the demo <svg class="qt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn btn--primary btn--sm" href="#early-access" data-cta="header"><span><span class="cta-long">Request </span>Early Access</span></a>
         <button class="menu-btn" type="button" aria-expanded="false" aria-controls="mobile-menu" data-menu-btn>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
           <span>Menu</span>
@@ -49,30 +48,30 @@
     <div class="mobile-menu" id="mobile-menu" hidden>
       <nav aria-label="Mobile">
         <ul>
-          <li><a href="#product">Product</a></li>
-          <li><a href="#how">How it works</a></li>
-          <li><a href="#demo">Interactive demo</a></li>
-          <li><a href="#faq">FAQ</a></li>
-          <li><a href="#early-access">Early access</a></li>
+          <li><a href="./" aria-current="page">Home</a></li>
+          <li><a href="how-it-works.html">How it works</a></li>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="demo.html">Interactive demo</a></li>
+          <li><a href="faq.html">FAQ</a></li>
         </ul>
       </nav>
-      <a class="btn btn--primary" href="demo.html">Explore the interactive demo</a>
+      <a class="btn btn--primary" href="#early-access">Request Early Access</a>
       <a class="btn" href="demo.html?tour=1">Start the guided tour</a>
     </div>
   </header>
 
   <main id="main">
-    <!-- Hero -->
+    <!-- 1. Hero -->
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-stage" aria-hidden="true"></div>
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <p class="pill"><span class="pill-dot" aria-hidden="true"></span>For roofing, siding &amp; window contractors</p>
           <h1 id="hero-title">Your next job might already be in <span class="hl">your estimates.</span></h1>
-          <p class="lede">Stop losing track of opportunities. QuoteTend keeps every outstanding estimate in one place, shows exactly who needs a follow-up today, and helps your team turn more conversations into signed jobs.</p>
+          <p class="lede">QuoteTend keeps every outstanding estimate in one place, shows exactly who needs a follow-up today, and keeps a record of what happened next.</p>
           <div class="hero-actions">
-            <a class="btn btn--primary btn--lg" href="demo.html">Explore the interactive demo <svg class="qt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-            <a class="btn btn--lg" href="#early-access">Get early access</a>
+            <a class="btn btn--primary btn--lg" href="#early-access" data-cta="hero">Request Early Access <svg class="qt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+            <a class="btn btn--lg" href="demo.html" data-cta="hero-demo">Try the Interactive Demo</a>
           </div>
           <ul class="hero-proof">
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Try the full demo in your browser — no sign-up</li>
@@ -96,7 +95,7 @@
       </div>
     </section>
 
-    <!-- Problem -->
+    <!-- 2. The problem -->
     <section class="section problem" id="problem" aria-labelledby="problem-title">
       <div class="wrap">
         <div class="section-head reveal">
@@ -118,177 +117,64 @@
           </article>
         </div>
         <p class="fineprint">Illustration using the fictional Fernbrook Roofing &amp; Exteriors demo account. These figures are not customer results.</p>
-
-        <div class="calc reveal" aria-labelledby="calc-title">
-          <div class="calc-copy">
-            <p class="eyebrow">Your numbers</p>
-            <h3 id="calc-title">What’s waiting in your estimates right now?</h3>
-            <p>Adjust the sliders to match a typical month for your business.</p>
-          </div>
-          <div class="calc-inputs">
-            <label><span class="calc-row">Estimates sent per month <output for="calc-count" data-out="count">30</output></span><input id="calc-count" type="range" min="5" max="150" step="5" value="30" data-calc="count"></label>
-            <label><span class="calc-row">Average estimate value <output for="calc-avg" data-out="avg">$14,000</output></span><input id="calc-avg" type="range" min="1000" max="60000" step="500" value="14000" data-calc="avg"></label>
-            <label><span class="calc-row">Still waiting on a decision <output for="calc-share" data-out="share">40%</output></span><input id="calc-share" type="range" min="10" max="90" step="5" value="40" data-calc="share"></label>
-          </div>
-          <div class="calc-result" aria-live="polite">
-            <span>From one month of estimates, still undecided</span>
-            <strong data-out="total">$168,000</strong>
-            <p>That’s <b data-out="open">12</b> homeowners each weighing a <b data-out="avg2">$14,000</b> decision. A clear follow-up list makes sure none of them is left to memory.</p>
-            <small>Simple arithmetic on your inputs — not a forecast or a promise of results.</small>
-          </div>
-        </div>
       </div>
     </section>
 
-    <!-- Product -->
-    <section class="section" id="product" aria-labelledby="product-title" style="padding-top:0">
+    <!-- 3. Three core benefits -->
+    <section class="section benefits-section" id="benefits" aria-labelledby="benefits-title">
       <div class="wrap">
         <div class="section-head reveal">
-          <p class="eyebrow">The product</p>
-          <h2 id="product-title">One clear place for every estimate after it leaves your office.</h2>
-          <p class="lede">QuoteTend picks up where your estimating tool stops: what you’ve sent, what’s due, what was said and how it ended.</p>
+          <p class="eyebrow">What QuoteTend does</p>
+          <h2 id="benefits-title">One clear place for every estimate after it leaves your office.</h2>
         </div>
-
-        <div class="features">
-          <article class="feature feature--wide reveal" aria-labelledby="f1-title">
-            <div class="feature-copy">
-              <div>
-                <p class="feature-num"><b>01</b>Estimate visibility</p>
-                <h3 id="f1-title">See every open estimate — and what it’s worth.</h3>
-                <p>Find any estimate by customer, job, estimate ID or email, filter by status, and see the open pipeline value at a glance.</p>
-              </div>
-              <ul class="points">
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Search across customers, jobs, estimate IDs and emails</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Filter by draft, sent, won, lost or do-not-contact</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Open pipeline and won totals calculated from your records</li>
-              </ul>
+        <ul class="benefits">
+          <li class="benefit reveal">
+            <div class="benefit-visual frame frame--sage"><div class="step-ui step-ui--light" data-mini="organize" aria-hidden="true"></div></div>
+            <div class="benefit-copy">
+              <p class="feature-num"><b>01</b>Organize</p>
+              <h3>Every outstanding estimate, in one list.</h3>
+              <p>Customer, job, amount and status for each estimate you’ve sent, with your open pipeline totaled automatically.</p>
+              <a class="text-link" href="features.html#estimates">Estimate tracking <svg class="qt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
             </div>
-            <div class="frame frame--sage feature-visual"><div class="shot shot--feature" data-shot="estimates" aria-hidden="true"></div></div>
-          </article>
-
-          <article class="feature reveal" aria-labelledby="f2-title">
-            <div class="feature-copy">
-              <p class="feature-num"><b>02</b>Overdue &amp; upcoming follow-ups</p>
-              <h3 id="f2-title">Know exactly who to call today.</h3>
-              <p>Overdue, due today, upcoming and estimates that still need a date — sorted so the oldest promise rises to the top. Won, lost, draft and opted-out estimates stay out of the way.</p>
-              <ul class="points">
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Due &amp; overdue, Upcoming and Needs a date queues</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Days overdue and estimate value at a glance</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Customers who opt out leave every queue automatically</li>
-              </ul>
+          </li>
+          <li class="benefit reveal">
+            <div class="benefit-visual frame frame--gold"><div class="step-ui step-ui--light" data-mini="prioritize" aria-hidden="true"></div></div>
+            <div class="benefit-copy">
+              <p class="feature-num"><b>02</b>Prioritize</p>
+              <h3>Know who needs a call today.</h3>
+              <p>Follow-ups sort into overdue, due today, upcoming and needs a date, so the oldest promise is always first.</p>
+              <a class="text-link" href="features.html#queues">Follow-up queues <svg class="qt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
             </div>
-            <div class="frame frame--ivory feature-visual"><div class="shot shot--feature" data-shot="queue" aria-hidden="true"></div></div>
-          </article>
-
-          <article class="feature feature--flip reveal" aria-labelledby="f3-title">
-            <div class="feature-copy">
-              <p class="feature-num"><b>03</b>Editable follow-up drafts</p>
-              <h3 id="f3-title">Start every follow-up with the right words.</h3>
-              <p>Each estimate comes with a follow-up draft built from its details. Personalize it, save it, and copy it into your own email or texting app.</p>
-              <ul class="points">
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Drafts include the customer, job and estimate amount</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Edit freely and save your version with the estimate</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Copy in one click and send from the tools you already use</li>
-              </ul>
-              <p class="feature-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg><span>QuoteTend never sends messages on its own. Copying a draft doesn’t send anything or record a contact — you stay in control.</span></p>
+          </li>
+          <li class="benefit reveal">
+            <div class="benefit-visual frame frame--ivory"><div class="step-ui step-ui--light" data-mini="track" aria-hidden="true"></div></div>
+            <div class="benefit-copy">
+              <p class="feature-num"><b>03</b>Track</p>
+              <h3>A record of every follow-up and decision.</h3>
+              <p>Log each call, text or email after it happens, set the next check-in, and record won or lost when the homeowner decides.</p>
+              <a class="text-link" href="features.html#activity">Activity &amp; outcomes <svg class="qt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
             </div>
-            <div class="frame frame--gold feature-visual"><div class="shot shot--feature" data-shot="draft" aria-hidden="true"></div></div>
-          </article>
-
-          <article class="feature reveal" aria-labelledby="f4-title">
-            <div class="feature-copy">
-              <p class="feature-num"><b>04</b>Contact &amp; outcome tracking</p>
-              <h3 id="f4-title">A clear record of every conversation and decision.</h3>
-              <p>Log the call, text or email that happened, set the next check-in, and record won or lost when the homeowner decides. The activity history stays with the estimate.</p>
-              <ul class="points">
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Contact date, method, note and next follow-up in one step</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Won and lost outcomes clear the follow-up and keep the history</li>
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Do-not-contact requests apply to every estimate with that email</li>
-              </ul>
-            </div>
-            <div class="frame frame--sage feature-visual"><div class="shot shot--feature" data-shot="contact" aria-hidden="true"></div></div>
-          </article>
-
-          <div class="bento">
-            <article class="bento-card reveal" aria-labelledby="f5-title">
-              <div class="bento-copy">
-                <p class="feature-num"><b>05</b>Reporting &amp; pipeline</p>
-                <h3 id="f5-title">See what your follow-up activity adds up to.</h3>
-                <p>Follow-up Results shows contacts logged, estimates followed up and the outcomes recorded afterward — and every number opens the estimates behind it.</p>
-                <p class="feature-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg><span>Reports reflect what your team records. Won values are estimate amounts, not collected revenue or proof of what caused a sale.</span></p>
-              </div>
-              <div class="frame frame--ever"><div class="shot shot--feature" data-shot="results" aria-hidden="true"></div></div>
-            </article>
-            <article class="bento-card reveal" aria-labelledby="f6-title">
-              <div class="bento-copy">
-                <p class="feature-num"><b>06</b>CSV onboarding</p>
-                <h3 id="f6-title">Start with the spreadsheet you already have.</h3>
-                <p>Export your open estimates as CSV. QuoteTend matches your columns, converts dates and dollar amounts, and previews every row before anything is saved. Existing estimates are never overwritten.</p>
-              </div>
-              <div class="frame frame--ivory"><div class="shot shot--feature" data-shot="import" aria-hidden="true"></div></div>
-            </article>
-          </div>
+          </li>
+        </ul>
+        <div class="benefits-foot reveal">
+          <p><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg><span>Nothing is sent automatically. You reach customers from your own phone or email, then record what happened.</span></p>
+          <a class="btn" href="how-it-works.html">See how it works</a>
         </div>
       </div>
     </section>
 
-    <!-- How it works -->
-    <section class="how" id="how" aria-labelledby="how-title">
-      <div class="wrap">
-        <div class="how-panel">
-          <div class="section-head reveal">
-            <p class="eyebrow eyebrow--light">How it works</p>
-            <h2 id="how-title">From a pile of estimates to a clear next step.</h2>
-            <p class="lede">Four moves your team already understands. QuoteTend keeps them in order.</p>
-          </div>
-          <ol class="steps" data-steps>
-            <li class="step reveal">
-              <span class="step-num" aria-hidden="true">1</span>
-              <h3>Import</h3>
-              <p>Bring in open estimates from a CSV export, or add them one at a time. Preview every row before it’s saved.</p>
-              <div class="step-ui" data-mini="import" aria-hidden="true"></div>
-            </li>
-            <li class="step reveal">
-              <span class="step-num" aria-hidden="true">2</span>
-              <h3>Prioritize</h3>
-              <p>Sent estimates sort into due &amp; overdue, upcoming and needs a date, oldest promise first.</p>
-              <div class="step-ui" data-mini="prioritize" aria-hidden="true"></div>
-            </li>
-            <li class="step reveal">
-              <span class="step-num" aria-hidden="true">3</span>
-              <h3>Follow up</h3>
-              <p>Open the estimate, personalize the draft and reach out from your own phone or email.</p>
-              <div class="step-ui" data-mini="follow" aria-hidden="true"></div>
-            </li>
-            <li class="step reveal">
-              <span class="step-num" aria-hidden="true">4</span>
-              <h3>Track outcomes</h3>
-              <p>Log what happened and record won or lost. Reporting reflects exactly what your team recorded.</p>
-              <div class="step-ui" data-mini="track" aria-hidden="true"></div>
-            </li>
-          </ol>
-          <div class="how-foot">
-            <p>Want to see all four steps with real-looking data? The guided tour walks through them in about five minutes.</p>
-            <a class="btn btn--gold btn--lg" href="demo.html?tour=1">Start the guided tour <svg class="qt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Demo showcase -->
-    <section class="section" id="demo" aria-labelledby="demo-title">
+    <!-- 4. Product preview -->
+    <section class="section showcase-section" id="demo" aria-labelledby="demo-title">
       <div class="wrap showcase">
         <div class="reveal">
           <p class="eyebrow">Interactive demo</p>
           <h2 id="demo-title">Explore a fully loaded contractor account.</h2>
-          <p class="lede" style="margin-top:18px">Meet Fernbrook Roofing &amp; Exteriors — a fictional company with <span data-fill="estimateCount">22</span> estimates, overdue follow-ups, activity history and reporting. Take the five-step guided tour, or click around on your own.</p>
+          <p class="lede" style="margin-top:18px">Meet Fernbrook Roofing &amp; Exteriors — a fictional company with <span data-fill="estimateCount">22</span> estimates, overdue follow-ups, activity history and reporting.</p>
           <ul class="showcase-list">
             <li><span class="n">1</span><span>Find <span data-fill="overdueValue">$95,140</span> in overdue follow-ups</span></li>
-            <li><span class="n">2</span><span>Search and filter the estimate pipeline</span></li>
-            <li><span class="n">3</span><span>Open a roof replacement that’s past due</span></li>
-            <li><span class="n">4</span><span>Edit and copy a follow-up draft</span></li>
-            <li><span class="n">5</span><span>Log a call and record the outcome</span></li>
-            <li><span class="n">6</span><span>Watch Follow-up Results update</span></li>
+            <li><span class="n">2</span><span>Open a roof replacement that’s past due</span></li>
+            <li><span class="n">3</span><span>Edit and copy a follow-up draft</span></li>
+            <li><span class="n">4</span><span>Log a call and watch the results update</span></li>
           </ul>
           <div class="showcase-actions">
             <a class="btn btn--primary btn--lg" href="demo.html?tour=1">Start the guided tour <svg class="qt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
@@ -304,52 +190,7 @@
       </div>
     </section>
 
-    <!-- Today vs roadmap -->
-    <section class="section" aria-labelledby="truth-title" style="padding-top:0">
-      <div class="wrap">
-        <div class="section-head section-head--center reveal">
-          <p class="eyebrow">Straight answers</p>
-          <h2 id="truth-title">What’s available today — and what isn’t yet.</h2>
-          <p class="lede">QuoteTend is getting ready for early access. We’d rather you know exactly what you’re getting.</p>
-        </div>
-        <div class="truth">
-          <article class="truth-card truth-card--now reveal">
-            <h3>Available today <span class="badge">Built</span></h3>
-            <p>The core estimate follow-up workflow, end to end.</p>
-            <ul class="truth-list" data-truth="now">
-              <li>Estimate tracking with search and status filters</li>
-              <li>Follow-up queues: due &amp; overdue, upcoming, needs a date</li>
-              <li>Editable follow-up drafts you copy and send yourself</li>
-              <li>Contact logging with next follow-up dates</li>
-              <li>Won, lost and do-not-contact outcomes with activity history</li>
-              <li>CSV import with column matching and row-by-row preview</li>
-              <li>Follow-up Results reporting on recorded activity</li>
-              <li>CSV export and workspace backups</li>
-            </ul>
-          </article>
-          <article class="truth-card truth-card--next reveal">
-            <h3>On the roadmap <span class="badge">Not available yet</span></h3>
-            <p>Where we’re headed, shaped with early customers. None of these exist in QuoteTend today.</p>
-            <ul class="truth-list" data-truth="next">
-              <li>Automated email and text follow-up</li>
-              <li>Integrations with estimating tools, CRMs and calendars</li>
-              <li>Team accounts with assigned follow-ups</li>
-              <li>Sales intelligence and advanced pipeline analytics</li>
-            </ul>
-            <div class="good-to-know">
-              <h4>Good to know today</h4>
-              <ul data-truth="info">
-                <li>Each business has one owner login.</li>
-                <li>Estimates come in by CSV export or manual entry.</li>
-                <li>Amounts are in US dollars.</li>
-              </ul>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <!-- Early access -->
+    <!-- 5. Early access -->
     <section class="early" id="early-access" aria-labelledby="early-title">
       <div class="wrap">
         <div class="early-panel">
@@ -362,6 +203,7 @@
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Help importing open estimates from your spreadsheet or estimating-tool export</li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>A direct line to the people building QuoteTend</li>
             </ul>
+            <p class="early-more">Questions first? <a href="faq.html">Read the FAQ</a> or see <a href="features.html#availability">what’s available today</a>.</p>
           </div>
           <div class="early-card reveal" data-early>
             <h3>Request early access</h3>
@@ -370,48 +212,6 @@
               <noscript><p>Early-access requests need JavaScript enabled. You can still explore the <a href="demo.html">interactive demo</a>.</p></noscript>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- FAQ -->
-    <section class="section" id="faq" aria-labelledby="faq-title" style="padding-top:clamp(40px,5vw,72px)">
-      <div class="wrap faq-grid">
-        <div class="faq-aside reveal">
-          <p class="eyebrow">FAQ</p>
-          <h2 id="faq-title">Practical questions, straight answers.</h2>
-          <p class="lede">The fastest way to judge fit is to click through the demo with your own process in mind.</p>
-          <a class="btn btn--primary" href="demo.html">Explore the interactive demo <svg class="qt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        </div>
-        <div class="faq-list">
-          <details class="faq-item">
-            <summary>Does QuoteTend replace my CRM?<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></span></summary>
-            <div class="answer"><p><span class="status status--no">No</span>QuoteTend does one job: keeping sent estimates moving toward a decision. It works alongside the estimating software, CRM or spreadsheet you already use.</p><p>It doesn’t connect to other systems today. You bring estimates in with a CSV export or by adding them directly. Integrations are on the roadmap, not available yet.</p></div>
-          </details>
-          <details class="faq-item">
-            <summary>Can I import my existing estimates?<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></span></summary>
-            <div class="answer"><p><span class="status status--now">Yes</span>Export your estimates as a CSV file (save Excel workbooks as CSV first). QuoteTend matches your column names, converts common date and dollar formats, and previews every row before anything is saved.</p><p>Estimates already in QuoteTend are never overwritten, conflicting duplicates are held for review, and rows with missing information are flagged so you can fix the source file.</p></div>
-          </details>
-          <details class="faq-item">
-            <summary>Does QuoteTend send messages automatically?<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></span></summary>
-            <div class="answer"><p><span class="status status--no">No</span>QuoteTend prepares an editable draft for each follow-up. You copy it into your own email or texting app, send it yourself, then log the contact in QuoteTend.</p><p>Automated sending is on the roadmap. It isn’t available today, and we won’t describe it as available until it is.</p></div>
-          </details>
-          <details class="faq-item">
-            <summary>Can I try a demo?<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></span></summary>
-            <div class="answer"><p><span class="status status--now">Yes</span>The <a href="demo.html">interactive demo</a> is open to everyone with no sign-up. It uses a fictional roofing and exteriors company, runs entirely in your browser, and can be reset at any time. A <a href="demo.html?tour=1">five-step guided tour</a> shows the core workflow.</p></div>
-          </details>
-          <details class="faq-item">
-            <summary>How will onboarding work?<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></span></summary>
-            <div class="answer"><p>Early-access setup will be assisted. We’ll start with a conversation about how your team handles estimates today. Then we’ll help you export your open estimates, match the columns, and set follow-up dates, so your queue reflects real work from the start.</p><p>Before you import any real customer information, we’ll walk through where your data is stored and how it’s backed up.</p></div>
-          </details>
-          <details class="faq-item">
-            <summary>Is QuoteTend available for early customers?<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></span></summary>
-            <div class="answer"><p><span class="status status--next">Early access</span>We’re preparing assisted early access for a small group of exterior contractors. Timing, fit and early-customer pricing are discussed directly, before anyone commits to anything.</p></div>
-          </details>
-          <details class="faq-item">
-            <summary>Where do the reporting numbers come from?<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></span></summary>
-            <div class="answer"><p>Only from what your team records in QuoteTend: contacts logged, follow-up dates and won or lost outcomes. Values are estimate amounts. They are not collected revenue, and QuoteTend doesn’t claim credit for any sale.</p></div>
-          </details>
         </div>
       </div>
     </section>
@@ -429,8 +229,8 @@
         <div>
           <h2>Product</h2>
           <ul>
-            <li><a href="#product">Features</a></li>
-            <li><a href="#how">How it works</a></li>
+            <li><a href="how-it-works.html">How it works</a></li>
+            <li><a href="features.html">Features</a></li>
             <li><a href="demo.html">Interactive demo</a></li>
             <li><a href="demo.html?tour=1">Guided tour</a></li>
           </ul>
@@ -438,8 +238,9 @@
         <div>
           <h2>Company</h2>
           <ul data-footer-contact>
-            <li><a href="#early-access">Early access</a></li>
-            <li><a href="#faq">FAQ</a></li>
+            <li><a href="#early-access">Request early access</a></li>
+            <li><a href="faq.html">FAQ</a></li>
+            <li><a href="features.html#availability">Available today &amp; planned</a></li>
           </ul>
         </div>
       </div>

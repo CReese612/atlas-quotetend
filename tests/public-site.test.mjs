@@ -26,6 +26,15 @@ async function walk(dir = ROOT) {
   return out;
 }
 const today = W.todayISO();
+// The marketing pages (Sprint 1.7 multipage site). The demo and 404 page are separate.
+const MARKETING = ['index.html', 'how-it-works.html', 'features.html', 'faq.html'];
+const PAGES = [...MARKETING, 'demo.html'];
+const block = (html, re) => (html.match(re) || [''])[0];
+const navOf = html => block(html, /<ul class="nav-links">[\s\S]*?<\/ul>/);
+const mobileOf = html => block(html, /<div class="mobile-menu"[\s\S]*?<\/div>/);
+const footerOf = html => block(html, /<footer class="site-footer">[\s\S]*?<\/footer>/);
+// Links to the early-access form are "#early-access" on the homepage and "./#early-access" elsewhere.
+const portable = html => html.replaceAll(' aria-current="page"', '').replaceAll('href="./#early-access"', 'href="#early-access"');
 
 test('public site contains only public static file types', async () => {
   const files = await walk();
@@ -36,7 +45,7 @@ test('public site contains only public static file types', async () => {
     assert.ok(!/(^|\/)\./.test(f), `dotfile published: ${f}`);
   }
   for (const banned of ['.sqlite', '.env', 'backup', '.json', '.xlsx', '.csv']) assert.ok(!files.some(f => f.toLowerCase().includes(banned)), `private or data file published: ${banned}`);
-  assert.deepEqual(files.filter(f => f.endsWith('.html')).sort(), ['404.html', 'demo.html', 'index.html']);
+  assert.deepEqual(files.filter(f => f.endsWith('.html')).sort(), ['404.html', 'demo.html', 'faq.html', 'features.html', 'how-it-works.html', 'index.html']);
 });
 
 test('copy stays honest: no unsupported claims, placeholders or private references', async () => {
@@ -54,14 +63,89 @@ test('copy stays honest: no unsupported claims, placeholders or private referenc
   assert.match(text, /Not available yet/);
   assert.match(text, /won’t describe it as available until it is/);
   assert.match(text, /fictional/i);
-  // Sprint 1.6 accuracy corrections: claims must match the customer app.
-  const home = await read('index.html');
-  assert.match(home, /CSV export and workspace backups/);
-  assert.doesNotMatch(home, /full backups?|full history/i, 'workspace JSON backup is not a complete account backup');
-  assert.doesNotMatch(home, /streets?\b[^<]*(search|estimate IDs)|search[^<]*streets?|Filter by status, trade|Totals update as you filter|last contact at a glance|each with its dollar value/i, 'claims a search/filter feature the customer app does not have');
+  // Sprint 1.6 accuracy corrections: claims must match the customer app, now on every marketing page.
+  const pages = Object.fromEntries(await Promise.all(MARKETING.map(async p => [p, await read(p)])));
+  for (const [name, html] of Object.entries(pages)) {
+    assert.doesNotMatch(html, /full backups?|full history/i, `${name}: workspace JSON backup is not a complete account backup`);
+    assert.doesNotMatch(html, /streets?\b[^<]*(search|estimate IDs)|search[^<]*(streets?|phone|address|trade)|Filter by status, trade|filter[^<]*by trade|Totals update as you filter|last contact at a glance|each with its dollar value/i, `${name}: claims a search/filter feature the customer app does not have`);
+    // Sprint 1.7: no new capability claims (automation, integrations, AI, billing) and no invented proof or prices.
+    // (Questions such as "Does QuoteTend send messages automatically?" and "never sends messages" are allowed.)
+    for (const claim of [/\bautomatic(ally)? (send|sends|sending|texts?|emails?|reminders?|follow-ups?)\b/i, /(?<!never )\bsends (your |the )?(follow-ups?|messages?|texts?|emails?|reminders?)\b/i,
+      /auto-send/i, /\bAI[- ](written|generated|drafted|powered)\b/i, /artificial intelligence/i, /\bsyncs? with\b/i, /\bintegrates with\b/i, /connects to your (CRM|estimating)/i])
+      assert.doesNotMatch(html, claim, `${name}: claims unbuilt automation, AI or integrations (${claim})`);
+    assert.doesNotMatch(html, /\$\s?\d+(\.\d\d)?\s?(\/|per )\s?(mo|month|user|seat)\b|free trial|money-back|case stud|\d+\+? (contractors|customers|companies) (use|trust)|★|5-star|SOC ?2|HIPAA|GDPR[- ]compliant|bank-level|99\.9/i, `${name}: invented prices, proof, certifications or guarantees`);
+  }
   assert.doesNotMatch(text, /shows exactly how QuoteTend works today|is in early access\.|Product in early access/, 'implies the product is already in early access or that the demo is exact');
-  assert.match(home, /previews a few conveniences planned for the customer app/);
+  assert.match(pages['features.html'], /CSV export and workspace backups/);
+  assert.match(pages['features.html'], /Phone numbers, street addresses and trade tags appear in the demo as previews of planned customer-app fields/);
+  assert.match(pages['index.html'], /previews a few conveniences planned for the customer app/);
   assert.match(await read('demo.html'), /preview planned customer-app features/);
+  // The distinctions the owner requires: a draft is not a sent message, contact happens outside
+  // QuoteTend, and a recorded win is not proof QuoteTend caused the sale.
+  const how = pages['how-it-works.html'];
+  assert.match(how, /Editing, saving or copying a draft doesn’t send anything and doesn’t record a contact/);
+  assert.match(how, /Calls, texts and emails happen in the tools you already use/);
+  assert.match(how, /doesn’t show the follow-up caused the sale/);
+  assert.match(pages['faq.html'], /won’t describe it as available until it is/);
+  assert.match(pages['faq.html'], /doesn’t prove the follow-up caused the sale/);
+  assert.match(pages['index.html'], /Nothing is sent automatically/);
+});
+
+test('multipage structure: one homepage form, consistent navigation, unique metadata', async () => {
+  const pages = Object.fromEntries(await Promise.all(PAGES.map(async p => [p, await read(p)])));
+  const marketing = MARKETING.map(p => [p, pages[p]]);
+  // One early-access form, on the homepage; every other marketing page links to it.
+  assert.equal(PAGES.filter(p => /data-early[\s>]/.test(pages[p])).length, 1);
+  assert.match(pages['index.html'], /<section class="early" id="early-access"/);
+  for (const [name, html] of marketing) {
+    const links = html.match(name === 'index.html' ? /href="#early-access"/g : /href="\.\/#early-access"/g) || [];
+    assert.ok(links.length >= (name === 'index.html' ? 3 : 4), `${name}: links to the early-access form (${links.length})`);
+    if (name !== 'index.html') assert.doesNotMatch(html, /href="#early-access"/, `${name}: a bare #early-access link would not reach the homepage form`);
+    assert.match(html, /<a class="btn btn--primary btn--sm" href="(\.\/)?#early-access" data-cta="header"><span><span class="cta-long">Request <\/span>Early Access<\/span><\/a>/, `${name}: header call to action`);
+    assert.match(html, /href="demo\.html"/, `${name}: links to the demo`);
+  }
+  // Header, mobile menu and footer are identical on every marketing page apart from the active
+  // state and the homepage's in-page form link.
+  const [, first] = marketing[0];
+  for (const [name, html] of marketing) {
+    assert.equal(portable(navOf(html)), portable(navOf(first)), `${name}: primary navigation matches`);
+    assert.equal(portable(mobileOf(html)), portable(mobileOf(first)), `${name}: mobile menu matches`);
+    assert.equal(portable(footerOf(html)), portable(footerOf(first)), `${name}: footer matches`);
+    assert.deepEqual([...navOf(html).matchAll(/<a href="([^"]+)"/g)].map(m => m[1]), ['how-it-works.html', 'features.html', 'demo.html', 'faq.html'], `${name}: navigation order`);
+    const current = [...navOf(html).matchAll(/<a href="([^"]+)" aria-current="page"/g)].map(m => m[1]);
+    assert.deepEqual(current, name === 'index.html' ? [] : [name], `${name}: active navigation state`);
+    const mobileCurrent = [...mobileOf(html).matchAll(/<a href="([^"]+)" aria-current="page"/g)].map(m => m[1]);
+    assert.deepEqual(mobileCurrent, [name === 'index.html' ? './' : name], `${name}: active mobile menu state`);
+  }
+  // SEO: unique, descriptive titles and descriptions; one h1; no invented canonical or social URLs.
+  const titles = new Set(), descriptions = new Set();
+  for (const [name, html] of marketing) {
+    const title = html.match(/<title>([^<]+)<\/title>/)[1], description = html.match(/<meta name="description" content="([^"]+)">/)[1];
+    assert.match(title, /QuoteTend/, `${name}: title names QuoteTend`);
+    assert.ok(description.length >= 80 && description.length <= 200, `${name}: description length ${description.length}`);
+    titles.add(title); descriptions.add(description);
+    assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${name}: exactly one h1`);
+    assert.match(html, /<html lang="en">/);
+    assert.match(html, /<a class="skip-link" href="#main">/);
+    assert.match(html, /<main id="main">/);
+    assert.doesNotMatch(html, /rel="canonical"|property="og:(url|image)"|name="twitter:/, `${name}: no invented production URLs or social assets`);
+    assert.doesNotMatch(html, /googletagmanager|google-analytics|gtag\(|plausible|segment\.com|hotjar|clarity\.ms|facebook\.net/, `${name}: no analytics or tracking`);
+    for (const css of ['assets/css/tokens.css', 'assets/css/app.css', 'assets/css/site.css']) assert.ok(html.includes(`href="${css}"`), `${name}: ${css}`);
+    assert.match(html, /<script type="module" src="assets\/js\/site\.js"><\/script>/);
+  }
+  assert.equal(titles.size, MARKETING.length, 'titles are unique');
+  assert.equal(descriptions.size, MARKETING.length, 'descriptions are unique');
+  // The homepage stays focused: hero, problem, three benefits, product preview and early access.
+  const home = pages['index.html'];
+  assert.deepEqual([...home.matchAll(/<section class="([\w -]+)"/g)].map(m => m[1].split(' ')[0]), ['hero', 'trades', 'section', 'section', 'section', 'early']);
+  assert.equal((home.match(/<li class="benefit reveal">/g) || []).length, 3);
+  for (const moved of ['data-calc', 'class="faq-item"', 'class="truth"', 'class="steps"']) assert.equal(home.includes(moved), false, `homepage no longer carries ${moved}`);
+  assert.match(pages['how-it-works.html'], /data-calc="count"/);
+  assert.equal((pages['how-it-works.html'].match(/<li class="flow-step reveal" id="step-\d">/g) || []).length, 5);
+  assert.equal((pages['faq.html'].match(/<details class="faq-item">/g) || []).length, 11);
+  assert.match(pages['features.html'], /<section class="section availability-section" id="availability"/);
+  // Feature-page previews show only what the customer app has today.
+  assert.equal((pages['features.html'].match(/data-shot="\w+" data-core/g) || []).length, 8);
 });
 
 test('contact configuration: only the official Formspree endpoint, nothing invented, no secrets', async () => {
@@ -84,14 +168,18 @@ test('contact configuration: only the official Formspree endpoint, nothing inven
 });
 
 test('brand: one vector Ꝙ source for the wordmark, favicon and icons; plain "QuoteTend" in metadata', async () => {
-  const pages = { index: await read('index.html'), demo: await read('demo.html'), notFound: await read('404.html') };
+  const pages = { index: await read('index.html'), how: await read('how-it-works.html'), features: await read('features.html'), faq: await read('faq.html'), demo: await read('demo.html'), notFound: await read('404.html') };
+  const marketing = [pages.index, pages.how, pages.features, pages.faq];
   const favicon = await read('assets/favicon.svg');
   for (const part of ['bowl', 'tail', 'stroke']) {
-    for (const [name, html] of Object.entries({ index: pages.index, demo: pages.demo, favicon, notFound: pages.notFound })) assert.ok(html.includes(Q_GLYPH[part]), `${name} uses the shared ${part} path`);
+    for (const [name, html] of Object.entries({ ...pages, favicon })) assert.ok(html.includes(Q_GLYPH[part]), `${name} uses the shared ${part} path`);
   }
   // Header/footer wordmarks are exactly the component output; accessible text is the ordinary spelling.
-  assert.ok(pages.index.includes(wordmark().replace('class="wordmark "', 'class="wordmark"')), 'header wordmark matches components.wordmark()');
-  assert.ok(pages.index.includes(wordmark('wordmark--on-dark')), 'footer wordmark matches components.wordmark()');
+  for (const html of marketing) {
+    assert.ok(html.includes(wordmark().replace('class="wordmark "', 'class="wordmark"')), 'header wordmark matches components.wordmark()');
+    assert.ok(html.includes(wordmark('wordmark--on-dark')), 'footer wordmark matches components.wordmark()');
+    assert.equal((html.match(/aria-label="QuoteTend home"/g) || []).length, 2, 'header and footer brand links');
+  }
   assert.ok(pages.demo.includes(wordmark('wordmark--on-dark')), 'demo wordmark matches components.wordmark()');
   assert.match(wordmark(), /aria-hidden="true">[\s\S]*<\/svg><\/span><span class="sr-only">QuoteTend<\/span>$/);
   assert.match(await read('assets/css/tokens.css'), /\.wordmark::after \{ content: "uoteTend"; \}/);
@@ -101,7 +189,7 @@ test('brand: one vector Ꝙ source for the wordmark, favicon and icons; plain "Q
   }
   assert.match(pages.index, /aria-label="QuoteTend home"/);
   assert.match(pages.demo, /aria-label="QuoteTend website"/);
-  for (const page of [pages.index, pages.demo]) {
+  for (const page of [...marketing, pages.demo]) {
     for (const link of ['href="favicon.ico"', 'href="assets/favicon.svg"', 'href="assets/icons/apple-touch-icon.png"', 'href="site.webmanifest"']) assert.ok(page.includes(link), link);
   }
   const manifest = JSON.parse(await read('site.webmanifest'));
@@ -183,7 +271,7 @@ test('early-access form logic: configuration, validation, payload and honest res
 
 test('every internal link and asset reference resolves inside the public site', async () => {
   const files = new Set(await walk());
-  for (const page of ['index.html', 'demo.html']) {
+  for (const page of PAGES) {
     const html = await read(page);
     const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
     const refs = [...html.matchAll(/\s(?:href|src)="([^"]+)"/g)].map(m => m[1].replaceAll('&amp;', '&'));
@@ -202,19 +290,23 @@ test('every internal link and asset reference resolves inside the public site', 
   for (const js of ['assets/js/site.js', 'assets/js/demo.js', 'assets/js/tour.js', 'assets/js/early-access.js']) {
     for (const [, href] of (await read(js)).matchAll(/href="((?:index|demo)\.html[^"]*)"/g)) assert.ok(files.has(href.split(/[?#]/)[0]), `${js}: ${href}`);
   }
-  // Primary calls to action point at the demo and early-access sections.
+  // Primary calls to action: Request Early Access first, the interactive demo second.
   const home = await read('index.html');
-  assert.match(home, /class="btn btn--primary btn--sm" href="demo\.html"/);
-  assert.match(home, /class="btn btn--primary btn--lg" href="demo\.html"/);
+  assert.match(home, /<a class="btn btn--primary btn--lg" href="#early-access" data-cta="hero">Request Early Access /);
+  assert.match(home, /<a class="btn btn--lg" href="demo\.html" data-cta="hero-demo">Try the Interactive Demo<\/a>/);
   assert.match(home, /href="demo\.html\?tour=1"/);
   assert.match(home, /id="early-access"/);
-  assert.match(home, /class="btn btn--lg" href="#early-access">Get early access<\/a>/);
+  // The demo keeps its own links back to the website and the homepage form.
+  const demo = await read('demo.html');
+  assert.match(demo, /class="app-brand" href="index\.html"/);
+  assert.match(demo, /<a class="app-cta" href="index\.html#early-access">Early access<\/a>/);
+  assert.match(demo, /href="index\.html" data-icon="arrowLeft">Back to website<\/a>/);
 });
 
 function raw(port, path, method = 'GET') {
   return new Promise((done, fail) => {
     const req = request({ host: '127.0.0.1', port, path, method }, res => {
-      let body = ''; res.setEncoding('utf8'); res.on('data', c => { body += c; }); res.on('end', () => done({ status: res.statusCode, type: res.headers['content-type'] || '', body }));
+      let body = ''; res.setEncoding('utf8'); res.on('data', c => { body += c; }); res.on('end', () => done({ status: res.statusCode, type: res.headers['content-type'] || '', headers: res.headers, body }));
     });
     req.on('error', fail); req.end();
   });
@@ -232,10 +324,19 @@ test('preview server survives missing files and never serves outside public-site
       assert.equal(r.status, 404, missing);
     }
     assert.match((await raw(srv.port, '/missing-page')).body, /This page isn’t here/);
-    for (const page of ['/demo.html', '/demo.html?tour=1', '/index.html#faq', '/assets/css/site.css', '/assets/js/demo.js', '/assets/favicon.svg', '/favicon.ico', '/site.webmanifest', '/assets/icons/icon-512.png']) {
+    for (const page of ['/demo.html', '/demo.html?tour=1', '/index.html#early-access', '/assets/css/site.css', '/assets/js/demo.js', '/assets/favicon.svg', '/favicon.ico', '/site.webmanifest', '/assets/icons/icon-512.png']) {
       const r = await raw(srv.port, page);
       assert.equal(r.status, 200, page);
     }
+    // Sprint 1.7 pages are plain .html files served like the others, with the same protective headers.
+    for (const [page, heading] of [['/', /Your next job might already be in/], ['/how-it-works.html', /From a pile of estimates to a clear next step/], ['/features.html', /Everything that happens after the estimate goes out/], ['/faq.html', /Practical questions, straight answers/]]) {
+      const r = await raw(srv.port, page);
+      assert.equal(r.status, 200, page); assert.match(r.type, /text\/html/, page); assert.match(r.body, heading, page);
+      assert.equal(r.headers['x-content-type-options'], 'nosniff', page);
+      assert.equal(r.headers['x-frame-options'], 'SAMEORIGIN', page);
+      assert.equal(r.headers['referrer-policy'], 'strict-origin-when-cross-origin', page);
+    }
+    for (const missing of ['/how-it-works', '/features/', '/faq.htm']) assert.equal((await raw(srv.port, missing)).status, 404, missing);
     assert.match((await raw(srv.port, '/assets/js/demo.js')).type, /javascript/);
     assert.match((await raw(srv.port, '/assets/css/site.css')).type, /text\/css/);
     assert.match((await raw(srv.port, '/favicon.ico')).type, /image\/x-icon/);

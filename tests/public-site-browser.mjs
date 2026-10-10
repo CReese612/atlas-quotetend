@@ -14,6 +14,8 @@ const today = todayISO();
 const seed = createWorkspace(today);
 const usd = n => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 const M = metrics(seed.quotes, today), S = pipelineByState(seed.quotes, today);
+// Sprint 1.7 multipage marketing site. The early-access form lives only on the homepage.
+const MARKETING = ['index.html', 'how-it-works.html', 'features.html', 'faq.html'];
 
 const server = await startPublicServer({ port: 0 });
 const base = server.url;
@@ -79,17 +81,57 @@ try {
   await group('homepage renders product visuals from live demo data without errors (1440px)', async () => {
     const { context, page, errors } = await open('');
     assert.match(await text(page, 'h1'), /Your next job might already be in\s+your estimates\./);
-    for (const name of ['hero', 'scatter', 'sorted', 'estimates', 'queue', 'draft', 'contact', 'results', 'import', 'showcase']) {
+    for (const name of ['hero', 'scatter', 'sorted', 'showcase']) {
       assert.ok(await page.locator(`[data-shot="${name}"] *`).count() > 3, `${name} visual rendered`);
     }
+    for (const name of ['organize', 'prioritize', 'track']) assert.ok(await page.locator(`#benefits [data-mini="${name}"] .mini-row`).count() >= 3, `${name} benefit preview rendered`);
     assert.equal(await text(page, '[data-fill="openValue"]'), usd(M.openValue));
     assert.equal(await text(page, '[data-fill="overdueValue"]'), usd(S.overdue.value));
     assert.equal(await page.locator('[data-shot] [id]').count(), 0, 'decorative previews carry no duplicate ids');
     assert.equal(await page.locator('[data-shot="hero"][inert]').count(), 1, 'previews are inert');
+    // Sprint 1.7: the focused homepage (hero, problem, three benefits, product preview, early access).
+    assert.deepEqual(await page.$$eval('main > section h2', hs => hs.filter(h => !h.closest('[data-shot]')).map(h => h.textContent.trim())),
+      ['The estimate went out. Then the week happened.', 'One clear place for every estimate after it leaves your office.', 'Explore a fully loaded contractor account.', 'Bring us your open estimates. We’ll help you set up the follow‑up.']);
+    assert.equal(await page.locator('#benefits .benefit').count(), 3);
+    for (const moved of ['.faq-item', '.calc', '.truth', '.features']) assert.equal(await page.locator(moved).count(), 0, `${moved} moved off the homepage`);
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    assert.ok(height < 7000, `homepage stays short (${height}px at 1440; Sprint 1.6 was about 12,700px)`);
     await noOverflow(page);
     await shot(page, 'home-desktop-1440');
     await shot(page, 'home-desktop-1440-full', { fullPage: true });
     noErrors(errors); await context.close();
+  });
+
+  await group('supporting pages render their previews from live demo data without errors (1440px)', async () => {
+    const expect = {
+      'how-it-works.html': { minis: ['import', 'prioritize', 'follow', 'log', 'results'], shots: [] },
+      'features.html': { minis: [], shots: ['overview', 'estimates', 'record', 'queue', 'draft', 'contact', 'results', 'import'] },
+      'faq.html': { minis: [], shots: [] }
+    };
+    for (const [path, { minis, shots: names }] of Object.entries(expect)) {
+      const { context, page, errors } = await open(path);
+      assert.equal(await page.locator('h1').count(), 1, `${path}: one h1`);
+      for (const name of minis) assert.ok(await page.locator(`[data-mini="${name}"] > *`).count() >= 2, `${path}: ${name} step preview`);
+      for (const name of names) assert.ok(await page.locator(`[data-shot="${name}"] *`).count() > 3, `${path}: ${name} visual rendered`);
+      assert.equal(await page.locator('[data-shot] [id]').count(), 0, `${path}: previews carry no duplicate ids`);
+      assert.equal(await page.locator('[data-shot]:not([inert])').count(), 0, `${path}: previews are inert`);
+      if (path === 'features.html') {
+        // Feature previews show only what the customer app has today.
+        assert.equal(await page.locator('[data-core] .qt-trade').count(), 0, 'no trade tags in customer-app previews');
+        assert.equal(await page.locator('[data-core]', { hasText: /All trades|Any follow-up|Open pipeline\s*By follow-up state/ }).count(), 0, 'no demo-only filters or charts');
+        assert.match(await text(page, '[data-shot="estimates"] .summary-pv'), /Showing 7 of 22 estimates matching “roof”/, 'search preview counts only fields the customer app searches');
+        assert.match(await text(page, '[data-shot="record"]'), /Dana Whitfield[\s\S]*dana[\s\S]*\$21,480/i);
+        assert.doesNotMatch(await text(page, '[data-shot="record"]'), /555-01|Roofing ·|Street|Ave\b|Rd\b/, 'record preview shows no planned phone/address/trade fields');
+        // Every chip in the feature index lands on its section.
+        for (const href of await page.$$eval('.feature-index a', as => as.map(a => a.getAttribute('href')))) assert.equal(await page.locator(href).count(), 1, `feature index target ${href}`);
+        await page.locator('.feature-index a[href="#availability"]').click();
+        await page.waitForFunction(() => document.activeElement?.id === 'availability');
+        const settled = await page.waitForFunction(() => { const t = document.getElementById('availability').getBoundingClientRect().top; return t >= 0 && t < 140; }, null, { timeout: 4000 }).then(() => true, () => false);
+        assert.ok(settled, `feature index scrolls the section below the sticky header (${await page.locator('#availability').evaluate(el => el.getBoundingClientRect().top)}px)`);
+      }
+      await noOverflow(page);
+      noErrors(errors); await context.close();
+    }
   });
 
   await group('homepage hero is complete at 1920px', async () => {
@@ -103,35 +145,166 @@ try {
     noErrors(errors); await context.close();
   });
 
-  await group('every link on the homepage resolves; CTAs reach the demo (Sprint 1 failure path)', async () => {
-    const { context, page, errors } = await open('');
-    const hrefs = await page.$$eval('a[href]', as => as.map(a => ({ raw: a.getAttribute('href'), abs: a.href })));
-    for (const { raw, abs } of hrefs) {
-      assert.doesNotMatch(raw, /^(https?:|file:|javascript:)|localhost|127\.0\.0\.1/, `unexpected link ${raw}`);
-      assert.doesNotMatch(raw, /^mailto:/, 'no email link is shown while contact is unconfigured');
-      if (raw.startsWith('#')) { assert.ok(await page.locator(raw).count(), `missing anchor ${raw}`); continue; }
-      const res = await page.request.get(abs);
-      assert.equal(res.status(), 200, `${raw} -> ${res.status()}`);
+  await group('every link on every marketing page resolves; CTAs reach the form and the demo (Sprint 1 failure path)', async () => {
+    for (const path of MARKETING) {
+      const { context, page, errors } = await open(path);
+      const hrefs = await page.$$eval('a[href]', as => as.map(a => ({ raw: a.getAttribute('href'), abs: a.href })));
+      assert.ok(hrefs.length > 15, `${path}: links found`);
+      for (const { raw, abs } of hrefs) {
+        assert.doesNotMatch(raw, /^(https?:|file:|javascript:)|localhost|127\.0\.0\.1/, `${path}: unexpected link ${raw}`);
+        assert.doesNotMatch(raw, /^mailto:/, `${path}: no email link is shown while contact is unconfigured`);
+        if (raw.startsWith('#')) { assert.ok(await page.locator(raw).count(), `${path}: missing anchor ${raw}`); continue; }
+        const res = await page.request.get(abs);
+        assert.equal(res.status(), 200, `${path}: ${raw} -> ${res.status()}`);
+      }
+      noErrors(errors); await context.close();
     }
+    const { context, page, errors } = await open('');
     // A missing auto-requested file (Sprint 1: /favicon.ico) crashed the old server; the next click must still work.
     assert.equal((await page.request.get(base + 'apple-touch-icon-precomposed.png')).status(), 404);
-    assert.equal(await page.locator('.header-cta .btn--primary').getAttribute('href'), 'demo.html');
-    assert.equal(await page.locator('.hero-actions .btn--primary').getAttribute('href'), 'demo.html');
+    assert.equal(await page.locator('.header-cta .btn--primary').getAttribute('href'), '#early-access');
+    assert.equal(await page.locator('.hero-actions .btn--primary').getAttribute('href'), '#early-access');
+    assert.equal(await text(page, '.hero-actions .btn--primary'), 'Request Early Access');
+    assert.equal(await page.locator('.hero-actions .btn:not(.btn--primary)').getAttribute('href'), 'demo.html');
     assert.equal(await page.locator('#demo .showcase-actions .btn--primary').getAttribute('href'), 'demo.html?tour=1');
+    // Primary CTA: in-page jump to the form, with focus moved there.
     await page.locator('.hero-actions .btn--primary').click();
+    await page.waitForFunction(() => document.activeElement?.id === 'early-access');
+    assert.ok(await page.locator('#ea-name').isVisible(), 'form is on screen');
+    // Secondary CTA: the demo, and back.
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.locator('.hero-actions .btn:not(.btn--primary)').click();
     await page.waitForURL('**/demo.html');
     await page.locator('[data-main] h1').waitFor();
     assert.match(await text(page, '[data-main] h1'), /follow-ups need attention/);
     await page.goBack(); await page.locator('#hero-title').waitFor();
-    await page.locator('.nav-links a[href="#faq"]').click();
-    await page.waitForFunction(() => document.activeElement?.id === 'faq');
+    await page.locator('.nav-links a[href="faq.html"]').click();
+    await page.waitForURL('**/faq.html');
     await page.locator('.faq-item summary').first().click();
     assert.equal(await page.locator('.faq-item').first().getAttribute('open'), '');
     noErrors(errors); await context.close();
   });
 
+  await group('site navigation (1440px): every page links to every page, shows where you are, and reaches the form', async () => {
+    const titles = { 'how-it-works.html': /How it works — QuoteTend/, 'features.html': /Features — QuoteTend/, 'demo.html': /· QuoteTend interactive demo/, 'faq.html': /FAQ — QuoteTend/ };
+    for (const path of MARKETING) {
+      const { context, page, errors } = await open(path);
+      const nav = await page.$$eval('.nav-links a', as => as.map(a => [a.getAttribute('href'), a.textContent.trim(), a.getAttribute('aria-current')]));
+      assert.deepEqual(nav, [['how-it-works.html', 'How it works', path === 'how-it-works.html' ? 'page' : null], ['features.html', 'Features', path === 'features.html' ? 'page' : null],
+        ['demo.html', 'Demo', null], ['faq.html', 'FAQ', path === 'faq.html' ? 'page' : null]], `${path}: navigation`);
+      if (path !== 'index.html') {
+        const current = page.locator('.nav-links a[aria-current="page"]');
+        assert.equal(await current.evaluate(a => getComputedStyle(a).backgroundColor), 'rgb(228, 238, 230)', `${path}: visible active state`);
+      }
+      assert.ok(await page.locator('.nav').isVisible() && !(await page.locator('[data-menu-btn]').isVisible()), `${path}: desktop navigation, no menu button`);
+      const cta = page.locator('[data-cta="header"]');
+      assert.equal(await cta.innerText(), 'Request Early Access', `${path}: header CTA label`);
+      // Header CTA from every page: the homepage form, scrolled below the sticky header, with focus.
+      await cta.click();
+      await page.waitForURL(url => url.hash === '#early-access');
+      await page.waitForFunction(() => document.activeElement?.id === 'early-access');
+      // The homepage jump scrolls smoothly; arriving from another page settles instantly.
+      const top = await page.waitForFunction(() => { const t = document.getElementById('early-access').getBoundingClientRect().top; return t >= 0 && t < 140 ? { t } : false; }, null, { timeout: 4000 })
+        .then(async h => (await h.jsonValue()).t, () => page.locator('#early-access').evaluate(el => el.getBoundingClientRect().top));
+      assert.ok(top >= 0 && top < 140, `${path}: early-access section is at the top of the screen (${top}px)`);
+      assert.ok(await page.locator('#ea-name').isVisible(), `${path}: form fields visible`);
+      assert.equal(new URL(page.url()).pathname, path === 'index.html' ? '/index.html' : '/', `${path}: the form lives on the homepage`);
+      if (path !== 'index.html') {
+        // Brand returns home; each nav destination loads with its own title. (The demo keeps its own
+        // in-app history, so each check starts from a fresh load of the page under test.)
+        for (const [href, title] of Object.entries(titles)) {
+          await page.goto(base + path, { waitUntil: 'networkidle' });
+          await page.locator(`.nav-links a[href="${href}"]`).click();
+          await page.waitForURL(`**/${href}`);
+          assert.match(await page.title(), title, `${path} -> ${href}`);
+        }
+        await page.goto(base + path, { waitUntil: 'networkidle' });
+        await page.locator('.site-header .brand').click();
+        await page.waitForURL(url => url.pathname === '/');
+        assert.match(await page.title(), /Estimate follow-up for roofing/);
+      }
+      noErrors(errors); await context.close();
+    }
+  });
+
+  await group('mobile navigation (390px) on every page: menu, active state, keyboard and the primary CTA', async () => {
+    for (const path of MARKETING) {
+      const { context, page, errors } = await open(path, { width: 390, height: 844, mobile: true });
+      await noOverflow(page);
+      const cta = page.locator('[data-cta="header"]');
+      assert.ok(await cta.isVisible(), `${path}: primary CTA stays in the header`);
+      assert.equal((await cta.innerText()).trim(), 'Early Access', `${path}: compact CTA label`);
+      const box = await cta.boundingBox();
+      assert.ok(box.x + box.width <= 390 && box.height >= 40, `${path}: CTA fits and is a comfortable tap target`);
+      assert.ok(await page.locator('.nav').isHidden());
+      const btn = page.locator('[data-menu-btn]');
+      assert.equal(await btn.getAttribute('aria-expanded'), 'false');
+      assert.match(await btn.evaluate(b => b.innerText || b.textContent), /Menu/, `${path}: menu button keeps an accessible name`);
+      await btn.click();
+      assert.equal(await btn.getAttribute('aria-expanded'), 'true');
+      const links = await page.$$eval('#mobile-menu nav a', as => as.map(a => [a.getAttribute('href'), a.getAttribute('aria-current')]));
+      assert.deepEqual(links.map(l => l[0]), ['./', 'how-it-works.html', 'features.html', 'demo.html', 'faq.html'], `${path}: every destination reachable`);
+      assert.deepEqual(links.filter(l => l[1] === 'page').map(l => l[0]), [path === 'index.html' ? './' : path], `${path}: active page marked`);
+      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('href')), './', `${path}: focus moves into the menu`);
+      for (const l of await page.locator('#mobile-menu a').all()) assert.ok(await l.isVisible(), `${path}: menu item visible`);
+      await page.keyboard.press('Tab');
+      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('href')), 'how-it-works.html', `${path}: keyboard moves through the menu`);
+      await page.keyboard.press('Escape');
+      assert.ok(await page.locator('#mobile-menu').isHidden());
+      assert.equal(await page.evaluate(() => document.activeElement?.hasAttribute('data-menu-btn')), true, `${path}: focus returns to the menu button`);
+      await noOverflow(page);
+      if (path === 'index.html') await shot(page, 'nav-mobile-390-closed');
+      await btn.click();
+      if (path === 'index.html') await shot(page, 'nav-mobile-390-open');
+      const next = path === 'features.html' ? 'faq.html' : 'features.html';
+      await page.locator(`#mobile-menu a[href="${next}"]`).click();
+      await page.waitForURL(`**/${next}`);
+      assert.ok(await page.locator('#mobile-menu').isHidden(), `${path}: menu starts closed on the next page`);
+      noErrors(errors); await context.close();
+    }
+  });
+
+  await group('responsive layouts: every marketing page at 390, 820, 1440 and 1920px without horizontal scroll', async () => {
+    for (const path of MARKETING) {
+      const name = path === 'index.html' ? 'home' : path.replace('.html', '');
+      for (const [width, height, mobile] of [[390, 844, true], [820, 1180, true], [1440, 900, false], [1920, 1080, false]]) {
+        const { context, page, errors } = await open(path, { width, height, mobile });
+        await noOverflow(page);
+        // Nothing is wider than the viewport, including previews and buttons.
+        const wide = await page.evaluate(w => [...document.querySelectorAll('main *, header *, footer *')].filter(el => { const r = el.getBoundingClientRect(); return r.width && (r.right > w + 1 || r.left < -1) && !el.closest('[data-shot], .hero-stage, .hp, .sr-only, .skip-link'); }).map(el => el.className || el.tagName).slice(0, 5), width);
+        assert.deepEqual(wide, [], `${path} at ${width}px: elements outside the viewport`);
+        assert.ok(await page.locator('h1').isVisible(), `${path} at ${width}px: heading visible`);
+        if (width === 1440 || width === 390) await shot(page, `${name}-${width === 390 ? 'mobile' : 'desktop'}-${width}-full`, { fullPage: true });
+        else await shot(page, `${name}-${width}`);
+        noErrors(errors); await context.close();
+      }
+    }
+  });
+
+  await group('FAQ: native accordion works with mouse and keyboard; group links jump to their questions', async () => {
+    const { context, page, errors } = await open('faq.html');
+    assert.equal(await page.locator('.faq-item').count(), 11);
+    assert.equal(await page.locator('.faq-item[open]').count(), 0, 'answers start collapsed so the page stays short');
+    const summary = page.locator('.faq-item summary', { hasText: 'Does QuoteTend send messages automatically?' });
+    await summary.focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await summary.evaluate(s => s.parentElement.open), true, 'Enter opens');
+    assert.match(await text(page, '.faq-item[open] .answer'), /won’t describe it as available until it is/);
+    await page.keyboard.press('Space');
+    assert.equal(await summary.evaluate(s => s.parentElement.open), false, 'Space closes');
+    const outline = await summary.evaluate(s => getComputedStyle(s).outlineStyle);
+    assert.notEqual(outline, 'none', 'focused question shows a focus ring');
+    await page.locator('.faq-jump a[href="#access-questions"]').click();
+    await page.waitForFunction(() => document.activeElement?.id === 'access-questions');
+    await page.locator('.faq-item summary', { hasText: 'How can I contact QuoteTend?' }).click();
+    await page.locator('.faq-item[open] a[href="./#early-access"]').click();
+    await page.waitForURL(url => url.pathname === '/' && url.hash === '#early-access');
+    await page.waitForFunction(() => document.activeElement?.id === 'early-access');
+    noErrors(errors); await context.close();
+  });
+
   await group('calculator updates from slider input and stays labeled as arithmetic', async () => {
-    const { context, page, errors } = await open('');
+    const { context, page, errors } = await open('how-it-works.html');
     await page.locator('#calc-count').fill('60');
     await page.locator('#calc-avg').fill('20000');
     await page.locator('#calc-share').fill('50');
@@ -381,14 +554,17 @@ try {
     await page.keyboard.press('Escape');
     assert.ok(await page.locator('#mobile-menu').isHidden());
     await shot(page, 'home-mobile-390');
-    await shot(page, 'home-mobile-390-full', { fullPage: true });
-    await btn.click(); await page.locator('#mobile-menu a[href="#how"]').click();
+    // The hero's primary CTA is full width and reaches the form; the menu's in-page link closes the menu.
+    const hero = await page.locator('.hero-actions .btn--primary').boundingBox();
+    assert.ok(hero.width >= 340 && hero.y + hero.height < 844 * 1.5, 'primary CTA is full width near the top');
+    await btn.click(); await page.locator('#mobile-menu a[href="#early-access"]').click();
     assert.ok(await page.locator('#mobile-menu').isHidden(), 'menu closes after navigation');
+    await page.waitForFunction(() => document.activeElement?.id === 'early-access');
     noErrors(errors); await context.close();
   });
 
-  await group('keyboard: skip links work and focus is visible on both pages', async () => {
-    for (const [path, target] of [['', 'main'], ['demo.html', 'app-main']]) {
+  await group('keyboard: skip links work and focus is visible on every page', async () => {
+    for (const [path, target] of [['', 'main'], ['how-it-works.html', 'main'], ['features.html', 'main'], ['faq.html', 'main'], ['demo.html', 'app-main']]) {
       const { context, page, errors } = await open(path);
       await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement?.textContent.trim()), 'Skip to content');
@@ -400,11 +576,13 @@ try {
     }
   });
 
-  await group('reduced motion: content is visible without scroll animations', async () => {
-    const { context, page, errors } = await open('', { reducedMotion: 'reduce' });
-    const opacity = await page.locator('#faq .faq-aside').evaluate(el => getComputedStyle(el).opacity);
-    assert.equal(opacity, '1');
-    noErrors(errors); await context.close();
+  await group('reduced motion: content is visible without scroll animations on every page', async () => {
+    for (const [path, selector] of [['', '#early-access .early-card'], ['how-it-works.html', '#step-5'], ['features.html', '#availability .truth-card'], ['faq.html', '.cta-panel']]) {
+      const { context, page, errors } = await open(path, { reducedMotion: 'reduce' });
+      assert.equal(await page.locator(selector).first().evaluate(el => getComputedStyle(el).opacity), '1', `${path || 'index'}: ${selector}`);
+      assert.equal(await page.evaluate(() => document.documentElement.classList.contains('js')), false, 'scroll reveal is not enabled');
+      noErrors(errors); await context.close();
+    }
   });
 
   // ---------------- Demo ----------------
@@ -700,6 +878,7 @@ try {
     const home = await open('', { width: 820, height: 1180, mobile: true });
     await noOverflow(home.page);
     assert.ok(await home.page.locator('[data-menu-btn]').isVisible(), 'compact navigation on tablet');
+    assert.equal(await home.page.locator('[data-cta="header"]').innerText(), 'Request Early Access', 'full CTA label on tablet');
     await shot(home.page, 'home-tablet-820');
     noErrors(home.errors); await home.context.close();
     const demo = await open('demo.html?tour=1', { width: 820, height: 1180, mobile: true });
