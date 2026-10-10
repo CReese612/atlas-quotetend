@@ -1,11 +1,11 @@
 # Import a fictional spreadsheet
 
-Keep the current browser and port. First open **Import & export → Download full backup** and save the JSON or copy it into a local `.json` file. CSV exports do not include activity history or saved drafts.
+Keep the current browser and port. First open **Settings & data → Download workspace export** and save the JSON or copy it into a local `.json` file. CSV exports do not include activity history or saved drafts.
 
 1. Export your spreadsheet as comma-separated CSV with one header row. XLSX and pasted tab-separated grids are not supported. Use fictional names and `example.com` emails.
 2. Give each estimate a stable, unique ID. Do not generate new IDs every time you export: the ID prevents repeat imports. Include customer, job, USD amount and estimate date. Add missing required information in the source spreadsheet.
 3. Choose the CSV file, or expand **Or paste CSV text**. Click **Match pasted columns** when pasting.
-4. Review every suggested column. Leave unavailable optional fields unmapped. Choose the date format actually used in the source. Map unfamiliar statuses explicitly: Draft = not shared, Sent = awaiting decision, Won = accepted, Lost = declined. A source without status defaults to Draft.
+4. Review every suggested column. Leave unavailable optional fields unmapped. Choose the date format actually used in the source. Map unfamiliar statuses explicitly: Draft = not shared, Sent = awaiting decision, Won = accepted, Lost = declined. A source without a status column uses the one status you choose for every row (Sent is preselected). Phone, project address and trade/service columns are optional and matched by common headings (Phone, Mobile, Job Site, Address, Trade, Service Type…).
 5. Map opt-outs when available. A mapped opt-out column accepts true/false, yes/no or 1/0; blank cells are invalid. Without this column, review the source for opt-outs before checking the acknowledgment. Missing email does not prevent import, but prevents matching that record to other email-based opt-outs.
 6. Click **Preview mapped estimates**. Check amounts, dates, statuses and all warnings. Nothing is saved yet. Changing a mapping invalidates the preview; changing a column also resets date/status options, so confirm them again.
 7. Import only when the ready rows are correct. The validation report can be copied or downloaded for fixing rejected rows. Correct the source and preview again; do not change existing IDs just to bypass a conflict.
@@ -39,4 +39,4 @@ If a rejected or conflicting row has an explicit opt-out and valid email, the en
 
 On narrow screens each preview record is stacked with its customer, amount/status and complete result, so errors do not require horizontal scrolling.
 
-Up to 2 MB and 5,000 estimate rows. Only USD and the displayed date formats are supported. A malformed CSV row with the wrong number of fields blocks preview until repaired. Missing follow-up dates on Sent estimates go to **Needs a date**; missing status stays Draft unless deliberately changed. Joist/basic accounting exports may lack needed fields: ask which export is actually available and recreate a fictional sample rather than requesting live customer data.
+Up to 2 MB and 5,000 estimate rows. Only USD and the displayed date formats are supported. A malformed CSV row with the wrong number of fields blocks preview until repaired. Missing follow-up dates on Sent estimates go to **Needs a date**; with no status column, every row gets the status you chose. Joist/basic accounting exports may lack needed fields: ask which export is actually available and recreate a fictional sample rather than requesting live customer data.

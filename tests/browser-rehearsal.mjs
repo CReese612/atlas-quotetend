@@ -320,6 +320,57 @@ try {
   await closeDrawer();
   pass('draft estimates can be marked sent; do-not-contact pauses drafts and clears the follow-up date');
 
+  // Failure paths: validation, hostile and long text, keyboard close, offline saves, expired session.
+  await page.locator('.app-cta').click();
+  await page.locator('[data-editor] [type=submit]').click();
+  assert.match(await page.locator('[data-editor] .dialog-error').innerText(), /customer name is required/i);
+  assert.equal(await page.locator('[data-editor] [name=customer_name]').getAttribute('aria-invalid'), 'true');
+  const hostile = 'Zoë "O’Brien" <img src=x onerror="window.__xss=1"> & Søn — Extraordinarily Long Customer Name Roofing & Exteriors Holdings LLC';
+  await page.locator('[data-editor] [name=customer_name]').fill(hostile);
+  await page.locator('[data-editor] [name=job_description]').fill('<b>Bold?</b> Roof & gutter package with a very long description that keeps going to test wrapping on narrow screens');
+  for (const [amount, phone, re] of [['-5', '', /Amount must be between/], ['1234.567', '', /Amount must be between/], ['abc', '', /Amount must be between/], ['1234.56', 'call me maybe', /Phone/]]) {
+    await page.locator('[data-editor] [name=amount_usd]').fill(amount === 'abc' ? '' : amount);
+    await page.locator('[data-editor] [name=customer_phone]').fill(phone);
+    await page.locator('[data-editor] [type=submit]').click();
+    assert.match(await page.locator('[data-editor] .dialog-error').innerText(), re, `${amount}/${phone}`);
+  }
+  const countBefore = (await state()).quotes.length;
+  await page.locator('[data-editor] [name=customer_phone]').fill('555-0177');
+  await page.locator('[data-editor] [type=submit]').click(); await toast(/added/);
+  const created = (await state()).quotes.find(x => x.customer_name === hostile);
+  assert.ok(created); assert.equal((await state()).quotes.length, countBefore + 1); assert.equal(created.amount_usd, 1234.56);
+  await nav('estimates'); await page.locator('#est-q').fill('Søn');
+  assert.equal(await page.locator('[data-main] img').count(), 0); assert.equal(await page.evaluate(() => window.__xss), undefined);
+  assert.match(await page.locator('tbody').innerText(), /<img src=x/);
+  const opener = page.locator(`button.qt-link[data-open="${created.estimate_id}"]`);
+  await opener.click(); await page.locator('#drawer-title').waitFor();
+  assert.equal(await page.locator('#drawer-title').innerText(), hostile);
+  assert.equal(await page.locator('[data-drawer] img').count(), 0);
+  await page.keyboard.press('Escape'); await page.locator('[data-drawer]').waitFor({ state: 'hidden' });
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.open), created.estimate_id, 'focus returns to the control that opened the drawer');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await opener.click(); await page.locator('#drawer-title').waitFor();
+  assert.equal(await page.locator('[data-drawer]').evaluate(e => e.scrollWidth <= e.clientWidth), true, 'long text wraps inside the drawer');
+  await noHorizontalScroll('390 long names');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await context.setOffline(true);
+  await page.locator('#draft-text').fill('Offline fictional draft');
+  await page.locator('[data-action="save-draft"]').click(); await toast(/could not be reached/);
+  await context.setOffline(false);
+  assert.equal((await state()).quotes.find(x => x.estimate_id === created.estimate_id).saved_draft, '', 'nothing saved while offline');
+  assert.equal(await page.locator('#draft-text').inputValue(), 'Offline fictional draft', 'unsaved text is kept');
+  await page.locator('[data-action="save-draft"]').click(); await toast(/Draft saved/);
+  assert.equal((await state()).quotes.find(x => x.estimate_id === created.estimate_id).saved_draft, 'Offline fictional draft');
+  await api('/logout', 'POST', {});   // the session ends (expiry or sign-out elsewhere) while the page is open
+  await page.locator('#draft-text').fill('Typed after the session ended');
+  await page.locator('[data-action="save-draft"]').click();
+  await page.locator('[data-banner]').waitFor({ state: 'visible' });
+  assert.match(await page.locator('[data-banner]').innerText(), /session has ended/);
+  assert.equal(await page.locator('#draft-text').inputValue(), 'Typed after the session ended');
+  await signIn('owner-a@example.com');
+  assert.equal((await state()).quotes.find(x => x.estimate_id === created.estimate_id).saved_draft, 'Offline fictional draft');
+  pass('validation errors, hostile text, keyboard close, offline saves and an expired session are handled without data loss or script injection');
+
   // Opt-out safeguard: an import that would discard an opt-out is blocked without writes.
   const blockedBefore = await state();
   const q = { estimate_id: 'NEW-GOOD', customer_name: 'Risk Example', customer_email: 'risk@example.com', job_description: 'Fictional job', amount_usd: 100, estimate_date: today, status: 'sent', next_follow_up_date: '', last_contact_date: '', do_not_contact: false, notes: '' };
@@ -358,7 +409,7 @@ try {
   assert.match(await page.locator('[data-banner]').innerText(), /changed in another tab/);
   assert.match(await page.locator('[data-editor] .dialog-error').innerText(), /another tab/);
   assert.equal(await page.locator('[data-editor] [name=customer_name]').inputValue(), 'Unsaved stale customer');
-  assert.equal((await state()).quotes.length, 7);
+  assert.equal((await state()).quotes.length, beforeStale.quotes.length);
   assert.equal((await state()).quotes.find(x => x.estimate_id === 'R-1003').notes, 'Concurrent fictional edit');
   await page.locator('[data-editor] [data-action="close-dialog"]').first().click();
   await page.locator('[data-action="reload-workspace"]').click(); await toast(/Latest saved data loaded/);

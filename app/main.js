@@ -26,7 +26,7 @@ let busy = false;          // one command at a time; protects against double sub
 let blocked = null;        // { kind: 'stale' | 'session' } — further changes wait for a reload or sign-in
 let lastTrigger = null;
 const freshImport = () => ({ step: 'choose', name: '', sheet: null, mapping: null, options: { dateFormat: 'iso', defaultStatus: 'sent', statusMap: {}, optOutReviewed: false }, rows: null, revision: null, error: '', pasted: '', done: null });
-const ui = { view: 'overview', query: '', status: 'all', followup: 'any', trade: 'all', sort: 'followup', limit: 100, queue: 'due', range: 30, from: '', to: '', group: 'cohort',
+const ui = { view: 'overview', query: '', status: 'all', followup: 'any', trade: 'all', sort: 'followup', limit: 100, queueLimit: 100, queue: 'due', range: 30, from: '', to: '', group: 'cohort',
   drawer: null, drafts: {}, contactValues: {}, draftStatus: '', draftOk: false, imp: freshImport() };
 const results = { key: '', data: null, weekly: null, error: '', request: 0 };
 const ctx = () => ({ ws, me, configuration, ui, prefs, results, today: D.todayISO() });
@@ -136,7 +136,7 @@ function parseHash() {
 function navigate(view, { focus = true } = {}) {
   if (!VIEWS[view]) view = 'overview';
   if (ui.drawer) closeDrawerUI({ restoreFocus: false });
-  ui.view = view; ui.limit = 100;
+  ui.view = view; ui.limit = 100; ui.queueLimit = 100;
   if (view === 'import' && ui.imp.step === 'done') ui.imp = freshImport();   // a finished import starts fresh; in-progress ones are kept
   if (location.hash !== '#' + view) history.pushState(null, '', '#' + view);
   closeNav();
@@ -347,7 +347,9 @@ async function submitEditor(form, button) {
     await run({ kind: 'create', fields }, { success: `Estimate ${item.estimate_id} added.`, target: editorEl, button, after: () => editorEl.close() });
     return;
   }
-  const fields = Object.fromEntries(EDITABLE.filter(k => candidate[k] !== q[k]).map(k => [k, candidate[k]]));
+  // Text areas report line breaks as \n; an imported \r\n in notes is not a change the owner made.
+  const lf = v => typeof v === 'string' ? v.replace(/\r\n?/g, '\n') : v;
+  const fields = Object.fromEntries(EDITABLE.filter(k => lf(candidate[k]) !== lf(q[k])).map(k => [k, candidate[k]]));
   if (!Object.keys(fields).length) { editorEl.close(); toast('No changes to save.'); return; }
   const optOutReview = q.do_not_contact && (!candidate.do_not_contact || D.emailKey(candidate.customer_email) !== D.emailKey(q.customer_email));
   if (optOutReview && !await confirmAction({ title: 'Change an opt-out?', body: 'Removing an opt-out, or changing the email it is attached to, can release the do-not-contact block on other estimates with that email. Continue only after confirming the customer’s current preference. Cleared follow-up dates are not restored automatically.', confirm: 'Save reviewed change', tone: 'warn', focusCancel: true })) return;
@@ -486,7 +488,7 @@ document.addEventListener('click', async event => {
     const outcomeBtn = el.closest('[data-outcome]');
     if (outcomeBtn) return outcome(outcomeBtn.dataset.outcome, outcomeBtn);
     const tab = el.closest('[data-queue]');
-    if (tab) { ui.queue = tab.dataset.queue; render(); return $(`[data-queue="${ui.queue}"]`, main)?.focus(); }
+    if (tab) { ui.queue = tab.dataset.queue; ui.queueLimit = 100; render(); return $(`[data-queue="${ui.queue}"]`, main)?.focus(); }
     const statusBtn = el.closest('[data-status]');
     if (statusBtn && main.contains(statusBtn)) {
       ui.status = statusBtn.dataset.status; ui.limit = 100;
@@ -510,6 +512,7 @@ document.addEventListener('click', async event => {
       case 'dismiss-guide': prefs.guideDismissed = true; savePrefs(); render(); return $('h1', main)?.focus();
       case 'clear-filters': Object.assign(ui, { query: '', status: 'all', followup: 'any', trade: 'all', limit: 100 }); render(); return $('#est-q', main)?.focus();
       case 'more': ui.limit += 200; return updateEstimateResults();
+      case 'more-queue': ui.queueLimit += 200; render(); return $('#queue-tabpanel', main)?.focus();
       case 'export-csv': return exportCSV();
       case 'export-json': return exportJSON();
       case 'copy-export': {
@@ -670,7 +673,7 @@ document.addEventListener('keydown', event => {
     const tabs = $$('[role="tab"]', main), i = tabs.indexOf(tab);
     const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (i + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
     event.preventDefault();
-    ui.queue = tabs[next].dataset.queue; render();
+    ui.queue = tabs[next].dataset.queue; ui.queueLimit = 100; render();
     $(`[data-queue="${ui.queue}"]`, main)?.focus();
   }
   return undefined;

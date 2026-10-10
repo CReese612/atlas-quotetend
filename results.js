@@ -21,11 +21,14 @@ export function followupResults({ quotes, events, identities, startedAt, epoch }
     name: current.get(e.estimateId.toLowerCase())?.customer_name || e.estimateId, date: e.effectiveDate, channel: e.data.channel,
     value: e.data.amount, recordedAt: e.recordedAt }));
   const cohort = [];
+  // Group once by record (events keep ledger order within each group) instead of rescanning per estimate.
+  const group = rows => { const map = new Map(); for (const e of rows) { if (!map.has(e.recordId)) map.set(e.recordId, []); map.get(e.recordId).push(e); } return map; };
+  const eventsByRecord = group(active), contactsByRecord = group(contacts);
   for (const identity of identities) {
     const q = current.get(identity.estimateId.toLowerCase()); if (!q) continue;
-    const own = active.filter(e => e.recordId === identity.recordId);
+    const own = eventsByRecord.get(identity.recordId) || [];
     // First reported date; sequence breaks same-day ties. Later backdated entries can move the cohort.
-    const ownContacts = contacts.filter(e => e.recordId === identity.recordId).sort((a,b) => a.effectiveDate.localeCompare(b.effectiveDate) || a.sequence-b.sequence);
+    const ownContacts = [...(contactsByRecord.get(identity.recordId) || [])].sort((a,b) => a.effectiveDate.localeCompare(b.effectiveDate) || a.sequence-b.sequence);
     const first = ownContacts[0]; if (!first || !inRange(first.effectiveDate)) continue;
     const transitions = own.filter(e => ['status_changed', 'outcome_corrected'].includes(e.type));
     const last = transitions.at(-1);
@@ -36,7 +39,8 @@ export function followupResults({ quotes, events, identities, startedAt, epoch }
       followedValue: first.data.amount, outcome, outcomeDate: known ? last.effectiveDate : '',
       wonValue: outcome === 'won' ? last.data.after.amount : 0, origin: identity.origin });
   }
-  const overdue = quotes.filter(q => eligible(q, quotes) && q.next_follow_up_date && q.next_follow_up_date < today)
+  const blocks = quotes.filter(q => q.do_not_contact);
+  const overdue = quotes.filter(q => eligible(q, blocks) && q.next_follow_up_date && q.next_follow_up_date < today)
     .map(q => ({ estimateId:q.estimate_id, name:q.customer_name, date:q.next_follow_up_date, value:q.amount_usd }));
   const sum = (rows,key) => rows.reduce((total,r) => total + Math.round(r[key]*100),0)/100;
   const won = cohort.filter(r=>r.outcome==='won');

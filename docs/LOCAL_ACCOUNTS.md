@@ -13,9 +13,9 @@ $env:PORT = '4173'
 & $qtNode server.mjs
 ```
 
-Leave PowerShell open. Open [private accounts](http://127.0.0.1:4173/signin), choose **Create a local business account**, and use a fictional business and owner email such as `owner@example.com`. Choose and keep a unique password. Accounts start empty; add a fictional estimate or deliberately import a fictional CSV. The email is an identifier, not verified ownership of an inbox.
+Leave PowerShell open. Open [sign in](http://127.0.0.1:4173/signin), choose **Create a business account**, and use a fictional business and owner email such as `owner@example.com`. Choose and keep a unique password. Accounts start empty; add a fictional estimate or deliberately import a fictional CSV. The email is an identifier, not verified ownership of an inbox.
 
-The [existing browser demo](http://127.0.0.1:4173/) still uses its original `quotetend.demo.v1` browser storage. Keep using the same browser and exact address for that data. Signing in, signing out and creating accounts never copy, clear or migrate it. Account workspaces have no demo-reset button. Account drafts use the signed-in business name.
+Since Sprint 2, `/` opens the private app (it redirects to `/account`, which asks you to sign in). The earlier browser-only painting demo was retired; anything it saved under `quotetend.demo.v1` stays in that browser's storage but is no longer shown. The fictional interactive demo is on the public website (`public-site/`). Account workspaces have no demo-reset button. Account drafts use the signed-in business name.
 
 Node **24+** is required (verified with 24.19.0). Dependencies are installed in this project. If rebuilding dependencies, run these from the project folder; this downloads public packages, without connecting any business account:
 
@@ -50,7 +50,7 @@ $env:QUOTETEND_DB = Join-Path $env:TEMP ('quotetend-practice-' + [guid]::NewGuid
 & $qtNode server.mjs
 ```
 
-Use http://127.0.0.1:4176/signin. The server prints the selected database location. The original browser demo on port 4176 may still contain earlier fictional rehearsal records, but the new account database starts empty.
+Use http://127.0.0.1:4176/signin. The server prints the selected database location. The new account database starts empty.
 
 ## Backup and recovery
 
@@ -105,4 +105,4 @@ From the project folder, with `$qtNode` set as above:
 & $qtNode tests/browser-rehearsal.mjs
 ```
 
-The browser rehearsal uses installed Edge in a fresh headless profile, temporary database and temporary port. It never attaches to your browser. Chrome can be selected with `$env:QUOTETEND_BROWSER='chrome'`. Screenshots are written to `test-results`. Temporary test databases are removed at completion. Physical-phone and screen-reader behavior are not verified.
+The browser rehearsal uses installed Edge in a fresh headless profile, temporary database and temporary port. It never attaches to your browser. Chrome can be selected with `$env:QUOTETEND_BROWSER='chrome'`, or any Chromium build with `$env:QUOTETEND_BROWSER_PATH='C:\path\to\chrome.exe'`. Screenshots are written to `test-results/private-app`. Temporary test databases are removed at completion. Physical-phone and screen-reader behavior are not verified.

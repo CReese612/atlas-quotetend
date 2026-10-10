@@ -1,5 +1,7 @@
 # QuoteTend handoff — September 18, 2026
 
+> **Sprint 2 update (October 2026):** the private app was rebuilt on the public demo's design system with optional phone/address/trade fields and schema 3. The legacy browser-only demo was retired. Current status, tests and acceptance steps: [SPRINT2_PRIVATE_APP.md](SPRINT2_PRIVATE_APP.md). The notes below describe the earlier milestone.
+
 **Local first-paid-customer preparation complete; live launch is blocked pending approval and verification.** Begin with [LAUNCH_READINESS](../LAUNCH_READINESS.md), then [START_HERE](../START_HERE.md).
 
 ## Changes completed

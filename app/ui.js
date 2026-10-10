@@ -1,6 +1,7 @@
 // Product UI components for the private application, rendered as HTML strings. They follow the
 // interactive demo's components (public-site/assets/js/components.js) and use the same shared CSS
 // classes, but render authenticated records. Every user-supplied value passes through esc().
+// Row helpers take `quotes` only for opt-out checks, so callers may pass D.optOutBlocks(quotes).
 // Bar and segment sizes are emitted as data attributes and applied with applySizes(), because the
 // Content-Security-Policy does not allow inline style attributes.
 import { daysBetween, followupState, optOutSources, eligible, CHANNELS, CONTACT_RESULTS, TRADES, addDays } from '/domain.js';

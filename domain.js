@@ -23,8 +23,12 @@ export function optOutSources(q, quotes = [q]) {
 export const eligible = (q, quotes = [q]) => q.status === 'sent' && !q.do_not_contact && optOutSources(q, quotes).length === 0;
 export const due = (q, today = todayISO(), quotes = [q]) => eligible(q, quotes) && !!q.next_follow_up_date && q.next_follow_up_date <= today;
 export const daysBetween = (from, to) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400000);
+// Opt-out rules only ever match opted-out estimates, so list-wide calculations pass just that subset:
+// results are identical to passing every estimate, in linear rather than quadratic time.
+export const optOutBlocks = quotes => quotes.filter(q => q.do_not_contact);
 export function normalizeWorkspace(quotes) {
-  return quotes.map(q => ({ ...normalize(q), next_follow_up_date: eligible(q, quotes) ? q.next_follow_up_date || '' : '' }));
+  const blocks = optOutBlocks(quotes);
+  return quotes.map(q => ({ ...normalize(q), next_follow_up_date: eligible(q, blocks) ? q.next_follow_up_date || '' : '' }));
 }
 const FIELD_NAMES = { customer_phone: 'Phone', address: 'Project address', trade: 'Trade or service' };
 const PHONE = /^\+?[0-9().\-\s/]{3,32}(?:\s*(?:x|ext\.?|#)\s*\d{1,6})?$/i;
@@ -71,8 +75,8 @@ export function parseBackup(text) {
 }
 export function metrics(quotes, today = todayISO()) {
   const open = quotes.filter(q => q.status === 'sent');
-  const won = quotes.filter(q => q.status === 'won');
-  return { openValue: open.reduce((s, q) => s + q.amount_usd, 0), openCount: open.length, dueCount: quotes.filter(q => due(q, today, quotes)).length, wonValue: won.reduce((s, q) => s + q.amount_usd, 0), wonCount: won.length, unscheduled: quotes.filter(q => eligible(q, quotes) && !q.next_follow_up_date).length };
+  const won = quotes.filter(q => q.status === 'won'), blocks = optOutBlocks(quotes);
+  return { openValue: open.reduce((s, q) => s + q.amount_usd, 0), openCount: open.length, dueCount: quotes.filter(q => due(q, today, blocks)).length, wonValue: won.reduce((s, q) => s + q.amount_usd, 0), wonCount: won.length, unscheduled: quotes.filter(q => eligible(q, blocks) && !q.next_follow_up_date).length };
 }
 export function draftMessage(q, company = 'Brush & Pine Painting', quotes = [q]) {
   if (!eligible(q, quotes)) throw new Error('Follow-up drafts are only available for sent estimates without an estimate or shared-email opt-out.');
@@ -196,10 +200,10 @@ export function recentlyContacted(quotes, today = todayISO(), days = 14) {
     .sort((a, b) => b.last_contact_date.localeCompare(a.last_contact_date) || a.customer_name.localeCompare(b.customer_name));
 }
 export function queues(quotes, today = todayISO()) {
-  const candidates = quotes.filter(q => eligible(q, quotes));
+  const blocks = optOutBlocks(quotes), candidates = quotes.filter(q => eligible(q, blocks));
   const byDate = (a, b) => a.next_follow_up_date.localeCompare(b.next_follow_up_date) || b.amount_usd - a.amount_usd;
   return {
-    due: candidates.filter(q => due(q, today, quotes)).sort(byDate),
+    due: candidates.filter(q => due(q, today, blocks)).sort(byDate),
     upcoming: candidates.filter(q => q.next_follow_up_date > today).sort(byDate),
     unscheduled: candidates.filter(q => !q.next_follow_up_date).sort((a, b) => a.estimate_date.localeCompare(b.estimate_date)),
     contacted: recentlyContacted(quotes, today)
@@ -208,7 +212,8 @@ export function queues(quotes, today = todayISO()) {
 // Open (sent) estimate value split by follow-up state. Buckets always sum to metrics().openValue.
 export function pipelineByState(quotes, today = todayISO()) {
   const out = Object.fromEntries(['overdue', 'today', 'upcoming', 'unscheduled', 'paused'].map(k => [k, { count: 0, value: 0 }]));
-  for (const q of quotes.filter(q => q.status === 'sent')) { const s = followupState(q, today, quotes); out[s].count++; out[s].value += q.amount_usd; }
+  const blocks = optOutBlocks(quotes);
+  for (const q of quotes.filter(q => q.status === 'sent')) { const s = followupState(q, today, blocks); out[s].count++; out[s].value += q.amount_usd; }
   return out;
 }
 export function ageBuckets(quotes, today = todayISO()) {
@@ -235,22 +240,23 @@ const digits = s => String(s || '').replace(/\D/g, '');
 export function filterEstimates(quotes, { query = '', status = 'all', followup = 'any', trade = 'all', sort = 'followup' } = {}, today = todayISO()) {
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const rank = { overdue: 0, today: 1, upcoming: 2, unscheduled: 3, paused: 4, draft: 5, closed: 6 };
+  const blocks = optOutBlocks(quotes), states = new Map(quotes.map(q => [q, followupState(q, today, blocks)]));
   const list = quotes.filter(q => {
     if (terms.length) {
       const hay = [q.estimate_id, q.customer_name, q.job_description, q.trade, q.address, q.customer_email, q.customer_phone, q.notes].join(' ').toLowerCase();
       const phone = digits(q.customer_phone);
       if (terms.some(t => !hay.includes(t) && !(/^[\d()+.\-]+$/.test(t) && digits(t).length >= 3 && phone.includes(digits(t))))) return false;
     }
-    if (status === 'optout') { if (!optOutSources(q, quotes).length) return false; }
+    if (status === 'optout') { if (!optOutSources(q, blocks).length) return false; }
     else if (status !== 'all' && q.status !== status) return false;
     if (trade === '__none') { if ((q.trade || '').trim()) return false; }
     else if (trade !== 'all' && (q.trade || '').trim().toLowerCase() !== trade.toLowerCase()) return false;
-    if (followup === 'due') return due(q, today, quotes);
-    if (followup !== 'any' && followupState(q, today, quotes) !== followup) return false;
+    if (followup === 'due') return due(q, today, blocks);
+    if (followup !== 'any' && states.get(q) !== followup) return false;
     return true;
   });
   const sorters = {
-    followup: (a, b) => rank[followupState(a, today, quotes)] - rank[followupState(b, today, quotes)] || (a.next_follow_up_date || '9').localeCompare(b.next_follow_up_date || '9') || b.amount_usd - a.amount_usd,
+    followup: (a, b) => rank[states.get(a)] - rank[states.get(b)] || (a.next_follow_up_date || '9').localeCompare(b.next_follow_up_date || '9') || b.amount_usd - a.amount_usd,
     value: (a, b) => b.amount_usd - a.amount_usd || a.customer_name.localeCompare(b.customer_name),
     newest: (a, b) => b.estimate_date.localeCompare(a.estimate_date) || b.estimate_id.localeCompare(a.estimate_id),
     oldest: (a, b) => a.estimate_date.localeCompare(b.estimate_date) || a.estimate_id.localeCompare(b.estimate_id),

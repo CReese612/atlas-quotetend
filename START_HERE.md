@@ -1,6 +1,6 @@
 # Start here: QuoteTend
 
-The separate browser demo and private local business accounts are ready for fictional practice. The Follow-up Results milestone passed automated and browser checks on September 18, 2026. No contractor interviews or customer demand have been validated. Grok is not needed to continue.
+Sprint 2 rebuilt the private business application on the public demo's design. It is ready for fictional practice and owner acceptance testing (see [docs/SPRINT2_PRIVATE_APP.md](docs/SPRINT2_PRIVATE_APP.md)). The Follow-up Results milestone passed automated and browser checks on September 18, 2026. No contractor interviews or customer demand have been validated. Grok is not needed to continue.
 
 For the current paid-customer preparation, read [LAUNCH_READINESS](LAUNCH_READINESS.md). After signing in, open **Account security** and save a recovery code. No email reset is sent. [Offer proposals](docs/PAID_PILOT_OFFER_DRAFT.md) and [operations](docs/LAUNCH_OPERATIONS.md) are prepared; nothing is deployed or connected.
 
@@ -17,20 +17,20 @@ $env:PORT = '4173'
 
 Requires Node.js 24+ and the already-installed dependencies. Stop the previous server with Ctrl+C before restarting; refreshing the browser cannot upgrade an old server. Leave the terminal open.
 
-- [Private local accounts](http://127.0.0.1:4173/signin): choose Create a local business account. Use a fictional business, an example.com owner email and a unique password. Each business starts empty and saves to SQLite on this computer.
-- [Existing browser demo](http://127.0.0.1:4173/): your original fictional workspace stays in the same browser storage. No automatic migration or reset occurs. Keep using the exact same address and browser.
+- [Sign in or create a business account](http://127.0.0.1:4173/signin): choose **Create a business account**. Use a fictional business, an example.com owner email and a unique password. Each business starts empty and saves to SQLite on this computer. After signing in you work at http://127.0.0.1:4173/account.
+- The fictional interactive demo now lives only on the public website (`node public-site/serve.mjs`, then http://127.0.0.1:4180/demo.html). The old browser-only painting demo at `/` was retired; `/` now opens the private app.
 
 For dependency setup, data locations, forgotten passwords and whole-database backup/recovery, use [the local account guide](docs/LOCAL_ACCOUNTS.md).
 
-Before experimenting, use **Import & export → Download full backup**. Save the JSON; if downloading does not work, use **Copy contents** and paste into a text file with the displayed `.json` name. CSV does not preserve drafts or history. Restore replaces the whole workspace; do not restore a test fixture into your normal workspace.
+Before experimenting, use **Settings & data → Download workspace export**. Save the JSON; if downloading does not work, use **Copy contents** and paste into a text file with the displayed `.json` name. CSV does not preserve drafts or history. Restore replaces the whole workspace; do not restore a test fixture into your normal workspace.
 
-For an isolated rehearsal, follow the separate port **and temporary database** instructions in [the account guide](docs/LOCAL_ACCOUNTS.md). A port change isolates browser demo storage but does not by itself isolate account databases.
+For an isolated rehearsal, follow the separate port **and temporary database** instructions in [the account guide](docs/LOCAL_ACCOUNTS.md). A port change alone does not isolate account databases.
 
 ## Try Follow-up Results
 
 In a private account, add a fictional Sent estimate, log a simulated contact, then mark it Won. Open **Follow-up Results** to inspect counts, estimate values and supporting records. Reopening the estimate changes its current classification. These are owner-reported outcomes, not proof of caused or collected revenue.
 
-The next account-server startup adds a versioned event ledger and saves a pre-migration SQLite copy for a nonempty old database. Existing estimate data is preserved and earlier history remains unverified. Restores retain opt-outs, create recoverable snapshots and start a new reporting period. See [measurement and recovery details](docs/FOLLOWUP_RESULTS.md).
+Each schema upgrade (most recently schema 3 in Sprint 2, for optional phone/address/trade) saves a pre-migration SQLite copy of a nonempty database before changing anything. Existing estimate data is preserved and earlier history remains unverified. Restores retain opt-outs, create recoverable snapshots and start a new reporting period. See [measurement and recovery details](docs/FOLLOWUP_RESULTS.md).
 
 Use the [pilot baseline worksheet](docs/interviews/PILOT_BASELINE.md) and [results-review template](docs/interviews/RESULTS_REVIEW.md) to prepare honest customer evidence.
 

@@ -59,7 +59,7 @@ export function overview(ctx) {
     </div>
     <div class="grid-2">
       ${panel(`Needs your attention <span class="qt-count">${q.due.length}</span>`, 'Due and overdue follow-ups, oldest promise first',
-        shown.length ? `<ul class="qt-attn-list">${shown.map(x => attentionRow(x, today, quotes)).join('')}</ul>${q.due.length > shown.length ? `<div class="more-row"><button class="qt-btn qt-btn--sm" type="button" data-nav="followups" data-preset="queue:due">View all ${q.due.length} in the queue ${icon('arrowRight')}</button></div>` : ''}`
+        shown.length ? `<ul class="qt-attn-list">${shown.map(x => attentionRow(x, today, D.optOutBlocks(quotes))).join('')}</ul>${q.due.length > shown.length ? `<div class="more-row"><button class="qt-btn qt-btn--sm" type="button" data-nav="followups" data-preset="queue:due">View all ${q.due.length} in the queue ${icon('arrowRight')}</button></div>` : ''}`
           : !quotes.length ? empty('estimates', 'No estimates yet', 'Import a CSV or add your first estimate. Follow-ups appear here on their due date.', `<div class="view-actions"><button class="qt-btn qt-btn--primary" type="button" data-nav="import">${icon('import')}Import CSV</button>${addButton.replace('qt-btn--primary', '')}</div>`)
             : empty('checkCircle', 'All caught up', 'No follow-ups are due today. Upcoming check-ins appear here on their date.', `<button class="qt-btn" type="button" data-nav="followups" data-preset="queue:upcoming">View upcoming</button>`),
         { action: `<button class="panel-link" type="button" data-nav="followups" data-preset="queue:due">Follow-up queue ${icon('arrowRight')}</button>`, bodyCls: '', label: 'Needs your attention' })}
@@ -79,7 +79,7 @@ export function overview(ctx) {
 export function estimates(ctx) {
   const { quotes } = ctx.ws, ui = ctx.ui, counts = D.statusTotals(quotes), trades = D.tradeOptions(quotes);
   const opt = (value, label, current) => `<option value="${esc(value)}" ${value === current ? 'selected' : ''}>${esc(label)}</option>`;
-  const optedOut = quotes.filter(q => D.optOutSources(q, quotes).length).length;
+  const blocks = D.optOutBlocks(quotes), optedOut = quotes.filter(q => D.optOutSources(q, blocks).length).length;
   return head('Pipeline', 'Estimates', 'Every estimate in one place. Search, filter and open any record.',
       `<button class="qt-btn" type="button" data-action="export-csv">${icon('download')}Export CSV</button><button class="qt-btn" type="button" data-nav="import">${icon('import')}Import CSV</button>${addButton}`) +
     `<section class="qt-panel cards-at-narrow" aria-label="Estimate list">
@@ -103,7 +103,7 @@ export function estimateResults(ctx) {
   const shown = list.slice(0, ui.limit);
   return `<div class="summary"><span role="status">Showing <strong>${list.length.toLocaleString('en-US')}</strong> of ${quotes.length.toLocaleString('en-US')} estimates${ui.query ? ` matching “${esc(ui.query)}”` : ''}</span>
       <span><strong>${money(open)}</strong> open value in view ${active ? `<button class="qt-btn qt-btn--sm qt-btn--ghost" type="button" data-action="clear-filters">${icon('x')}Clear filters</button>` : ''}</span></div>
-    ${list.length ? estimateTable(shown, ctx.today, quotes) + (list.length > shown.length ? `<div class="more-row"><button class="qt-btn" type="button" data-action="more">Show ${Math.min(200, list.length - shown.length)} more of ${(list.length - shown.length).toLocaleString('en-US')}</button></div>` : '')
+    ${list.length ? estimateTable(shown, ctx.today, D.optOutBlocks(quotes)) + (list.length > shown.length ? `<div class="more-row"><button class="qt-btn" type="button" data-action="more">Show ${Math.min(200, list.length - shown.length)} more of ${(list.length - shown.length).toLocaleString('en-US')}</button></div>` : '')
       : empty('search', 'No estimates match', 'Try a different search term or clear the filters.', '<button class="qt-btn" type="button" data-action="clear-filters">Clear filters</button>')}`;
 }
 
@@ -119,7 +119,7 @@ export function followups(ctx) {
     </section>`;
 }
 function queueBody(ctx, q) {
-  const { quotes } = ctx.ws, today = ctx.today, list = q[ctx.ui.queue];
+  const { quotes } = ctx.ws, today = ctx.today, list = q[ctx.ui.queue], blocks = D.optOutBlocks(quotes);
   if (!list.length) {
     return {
       due: empty('checkCircle', quotes.length ? 'All caught up' : 'No estimates yet', quotes.length ? 'Nothing is due or overdue. Upcoming follow-ups appear here on their date.' : 'Import or add estimates to build your follow-up queue.'),
@@ -128,11 +128,14 @@ function queueBody(ctx, q) {
       contacted: empty('Phone', 'No contacts logged in the last 14 days', 'After you follow up outside QuoteTend, log the contact on the estimate.')
     }[ctx.ui.queue];
   }
-  const rows = items => `<ul class="qt-queue">${items.map(x => queueRow(x, today, quotes)).join('')}</ul>`;
-  if (ctx.ui.queue !== 'due') return rows(list);
+  // Long queues render in pages; group headings always show the full count and value.
+  const shown = new Set(list.slice(0, ctx.ui.queueLimit));
+  const rows = items => items.some(x => shown.has(x)) ? `<ul class="qt-queue">${items.filter(x => shown.has(x)).map(x => queueRow(x, today, blocks)).join('')}</ul>` : '';
+  const more = list.length > shown.size ? `<div class="more-row"><button class="qt-btn" type="button" data-action="more-queue">Show ${Math.min(200, list.length - shown.size)} more of ${(list.length - shown.size).toLocaleString('en-US')}</button></div>` : '';
+  if (ctx.ui.queue !== 'due') return rows(list) + more;
   const overdue = list.filter(x => x.next_follow_up_date < today), now = list.filter(x => x.next_follow_up_date === today);
   const group = (label, items) => items.length ? `<div class="qt-queue-group"><span>${label} · ${items.length}</span><span>${money(items.reduce((s, x) => s + x.amount_usd, 0))}</span></div>${rows(items)}` : '';
-  return group('Overdue', overdue) + group('Due today', now);
+  return group('Overdue', overdue) + group('Due today', now) + more;
 }
 
 // ---------- Follow-up Results ----------
@@ -188,7 +191,7 @@ function mappingStep(ctx) {
   const imp = ctx.ui.imp, sheet = imp.sheet, map = imp.mapping, o = imp.options;
   const statuses = statusesFor(sheet, map);
   const sample = i => (sheet.rows.find(r => (r[i] || '').trim())?.[i] || '').slice(0, 40);
-  const field = key => `<label>${esc(FIELD_LABELS[key])} ${REQUIRED_FIELDS.includes(key) ? '<em class="is-required">required</em>' : '<em>optional</em>'}<select data-map="${key}"><option value="">${REQUIRED_FIELDS.includes(key) ? 'Choose a column' : key === 'status' ? 'No column — use a default status' : key === 'do_not_contact' ? 'No opt-out column — review below' : 'Not in this file'}</option>${sheet.headers.map((h, i) => `<option value="${i}" ${map[key] === String(i) ? 'selected' : ''}>${esc(h)}${sample(i) ? ` · e.g. ${esc(sample(i))}` : ''}</option>`).join('')}</select></label>`;
+  const field = key => `<label><span>${esc(FIELD_LABELS[key])} ${REQUIRED_FIELDS.includes(key) ? '<em class="is-required">required</em>' : '<em>optional</em>'}</span><select data-map="${key}"><option value="">${REQUIRED_FIELDS.includes(key) ? 'Choose a column' : key === 'status' ? 'No column — use a default status' : key === 'do_not_contact' ? 'No opt-out column — review below' : 'Not in this file'}</option>${sheet.headers.map((h, i) => `<option value="${i}" ${map[key] === String(i) ? 'selected' : ''}>${esc(h)}${sample(i) ? ` · e.g. ${esc(sample(i))}` : ''}</option>`).join('')}</select></label>`;
   return `<section class="qt-panel">
       <div class="import-hero"><div class="file-card"><span class="file-card__icon">${icon('file')}</span><div><strong>${esc(imp.name)}</strong><span>${plural(sheet.rows.length, 'row')} · ${plural(sheet.headers.length, 'column')} · nothing imported yet</span></div></div>
       <button class="qt-btn qt-btn--ghost" type="button" data-action="import-restart">Choose a different file</button></div>
