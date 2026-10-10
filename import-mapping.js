@@ -1,7 +1,7 @@
 import { CSV_COLUMNS, STATUSES, parseCSV, previewImport } from './domain.js';
 
 export const REQUIRED_FIELDS = ['estimate_id', 'customer_name', 'job_description', 'amount_usd', 'estimate_date'];
-export const FIELD_LABELS = { estimate_id: 'Estimate ID', customer_name: 'Customer name', customer_email: 'Email', job_description: 'Job description', amount_usd: 'Amount (USD)', estimate_date: 'Estimate date', status: 'Status', next_follow_up_date: 'Next follow-up date', last_contact_date: 'Last contact date', do_not_contact: 'Do not contact', notes: 'Notes' };
+export const FIELD_LABELS = { estimate_id: 'Estimate ID', customer_name: 'Customer name', customer_email: 'Email', job_description: 'Job description', amount_usd: 'Amount (USD)', estimate_date: 'Estimate date', status: 'Status', next_follow_up_date: 'Next follow-up date', last_contact_date: 'Last contact date', do_not_contact: 'Do not contact', notes: 'Notes', customer_phone: 'Phone', address: 'Project address', trade: 'Trade / service' };
 const aliases = {
   estimate_id: ['estimate id', 'quote id', 'quote number', 'estimate number', 'estimate invoice #', 'estimate #', 'quote #', 'id'],
   customer_name: ['customer name', 'client name', 'customer', 'client', 'name'],
@@ -12,7 +12,10 @@ const aliases = {
   status: ['status', 'quote status', 'estimate status'],
   next_follow_up_date: ['next follow up date', 'follow up date', 'next follow up', 'follow up'],
   last_contact_date: ['last contact date', 'last contact'],
-  do_not_contact: ['do not contact', 'opt out', 'opted out', 'dnc'], notes: ['notes', 'note']
+  do_not_contact: ['do not contact', 'opt out', 'opted out', 'dnc'], notes: ['notes', 'note'],
+  customer_phone: ['customer phone', 'client phone', 'phone', 'phone number', 'mobile', 'mobile phone', 'cell', 'cell phone', 'telephone'],
+  address: ['address', 'project address', 'job address', 'job site', 'site address', 'property address', 'street', 'street address', 'service address', 'location'],
+  trade: ['trade', 'service', 'service type', 'trade category', 'category', 'job type', 'work type', 'project type']
 };
 const headerKey = s => s.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
 export function inspectSpreadsheet(text) {

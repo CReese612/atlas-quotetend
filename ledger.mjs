@@ -3,13 +3,35 @@ import { CSV_COLUMNS, parseBackup, normalizeWorkspace, validDate, todayISO, reco
 import { followupResults, contactEvidence } from './results.js';
 
 const key = id => String(id).trim().toLowerCase();
-const fail = (message,status=400) => { const e=new Error(message); e.status=status; throw e; };
+const fail = (message,status=400,code) => { const e=new Error(message); e.status=status; if(code)e.code=code; throw e; };
 const snapshot = q => q ? { status:q.status, amount:q.amount_usd, followUp:q.next_follow_up_date, optedOut:q.do_not_contact, email:q.customer_email } : null;
+const usd = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n);
+const day = d => new Date(d+'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'});
+const FIELD_WORDS = { customer_name:'customer name', customer_email:'email', job_description:'job description', estimate_date:'estimate date', notes:'notes', customer_phone:'phone', address:'project address', trade:'trade' };
+// Plain-language activity entry for an owner edit. Built only from the validated before/after records.
+export function describeEdit(old, q) {
+  const parts=[]; let type='update';
+  if(old.status!==q.status) {
+    if(['won','lost'].includes(q.status)) { parts.push('Estimate marked '+q.status); type='outcome'; }
+    else parts.push(['won','lost'].includes(old.status) ? 'Estimate reopened as '+q.status : 'Status changed to '+q.status);
+  }
+  if(!old.do_not_contact && q.do_not_contact) { parts.push('Customer opted out; follow-ups stopped'); type='optout'; }
+  if(old.do_not_contact && !q.do_not_contact) parts.push('Opt-out removed after review');
+  if(old.amount_usd!==q.amount_usd) parts.push('Amount changed from '+usd(old.amount_usd)+' to '+usd(q.amount_usd));
+  const closedOut = old.status!==q.status || old.do_not_contact!==q.do_not_contact;
+  if((old.next_follow_up_date||'')!==(q.next_follow_up_date||'') && !(closedOut && !q.next_follow_up_date)) {
+    parts.push(q.next_follow_up_date ? 'Next follow-up set for '+day(q.next_follow_up_date) : 'Next follow-up date cleared');
+    if(parts.length===1) type='schedule';
+  }
+  const other=Object.keys(FIELD_WORDS).filter(k=>(old[k]??'')!==(q[k]??''));
+  if(other.length) parts.push('Updated '+other.map(k=>FIELD_WORDS[k]).join(', '));
+  return { text: parts.length ? parts.join('. ') : 'Estimate saved with no changes', type };
+}
 const clean = rows => {try { return parseBackup(JSON.stringify({version:1,quotes:rows})).map(q=>({...Object.fromEntries([...CSV_COLUMNS,'saved_draft','history'].map(k=>[k,q[k]]))})); } catch(e) {fail(e.message);} };
 
 export function migrateLedger(db, path) {
   const version=db.prepare('PRAGMA user_version').get().user_version;
-  if(version>2) fail('This database needs a newer QuoteTend version. No migration was applied.');
+  if(version>3) fail('This database needs a newer QuoteTend version. No migration was applied.');
   if(version>=1) return;
   // Snapshot the old schema before adding anything. Existing quote JSON is never rewritten by migration.
   if(db.prepare('SELECT COUNT(*) AS n FROM businesses').get().n && path!==':memory:') {
@@ -60,7 +82,7 @@ export function attachLedger(store) {
     try {
       const previous=db.prepare('SELECT * FROM operations WHERE business_id=? AND request_id=?').get(business,command.requestId);
       if(previous) { if(previous.digest!==digest)fail('Request ID was already used for a different change.',409); db.exec('COMMIT');return {...store.workspace(business),replayed:true}; }
-      const w=store.workspace(business); if(w.revision!==command.revision)fail('Another tab saved changes. Your changes were not applied. Copy unsaved text, reload, then try again.',409);
+      const w=store.workspace(business); if(w.revision!==command.revision)fail('Another tab saved changes. Your changes were not applied. Copy unsaved text, reload, then try again.',409,'stale_revision');
       const at=new Date().toISOString(), today=todayISO(); let epoch=w.measurement.epoch;
       const date=command.effectiveDate||today; if(!validDate(date)||date>today)fail('Effective date must be a valid date no later than today.');
       let next=w.quotes.map(q=>({...q}));
@@ -85,7 +107,7 @@ export function attachLedger(store) {
         if(q.status!=='draft')emit('status_changed',q,{before:null,after:snapshot(q)});
         if(q.next_follow_up_date)emit('followup_scheduled',q,{before:'',after:q.next_follow_up_date});
         if(q.do_not_contact)emit('opt_out_changed',q,{before:false,after:true,email:q.customer_email});
-        next.push(addHistory(q,'Estimate added'));
+        next.push(addHistory(q,'Estimate added','created'));
       } else if(command.kind==='edit' || command.kind==='outcome') {
         const old=target();
         const allowed=CSV_COLUMNS.filter(k=>!['estimate_id','last_contact_date'].includes(k));
@@ -107,8 +129,9 @@ export function attachLedger(store) {
         }
         if(old.do_not_contact!==q.do_not_contact || old.customer_email!==q.customer_email)emit('opt_out_changed',q,{before:old.do_not_contact,after:q.do_not_contact,beforeEmail:old.customer_email,email:q.customer_email});
         if(old.next_follow_up_date!==q.next_follow_up_date)emit('followup_scheduled',q,{before:old.next_follow_up_date,after:q.next_follow_up_date});
-        emit('estimate_edited',q,{changedFields:allowed.filter(k=>old[k]!==q[k])});
-        replace(addHistory(q,command.kind==='outcome'?'Outcome recorded: '+q.status:'Estimate updated'));
+        emit('estimate_edited',q,{changedFields:allowed.filter(k=>(old[k]??'')!==(q[k]??''))});
+        const summary=command.kind==='outcome' && old.status===q.status ? {text:'Outcome confirmed: '+q.status+' (reported '+day(date)+')',type:'outcome'} : describeEdit(old,q);
+        replace(addHistory(q,summary.text,summary.type));
       } else if(command.kind==='draft') {
         const q=target(); if(!eligible(q,next))fail('Drafts are paused for this estimate.');
         if(typeof command.text!=='string'||command.text.length>10000)fail('Draft must be at most 10,000 characters.');
@@ -117,7 +140,7 @@ export function attachLedger(store) {
         const q=target(); const contact=command.contact||{};
         if(typeof contact.note!=='string'||contact.note.length>2000)fail('Contact note must be at most 2,000 characters.');
         let changed; try {changed=recordContact(q,contact,today,next);}catch(e){fail(e.message);}
-        replace(changed); emit('contact_logged',q,{channel:contact.channel,amount:q.amount_usd,currency:'USD',nextDate:contact.nextDate,previousLastContact:q.last_contact_date},contact.date);
+        replace(changed); emit('contact_logged',q,{channel:contact.channel,amount:q.amount_usd,currency:'USD',nextDate:contact.nextDate,previousLastContact:q.last_contact_date,...(contact.result?{result:contact.result}:{})},contact.date);
         emit('followup_scheduled',q,{before:q.next_follow_up_date,after:contact.nextDate},contact.date);
       } else if(command.kind==='correct-contact') {
         const q=target(), own=events(business).filter(e=>e.epoch===epoch && e.recordId===identity(q));

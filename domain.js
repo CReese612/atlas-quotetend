@@ -1,5 +1,17 @@
 export const STATUSES = ['draft', 'sent', 'won', 'lost'];
-export const CSV_COLUMNS = ['estimate_id', 'customer_name', 'customer_email', 'job_description', 'amount_usd', 'estimate_date', 'status', 'next_follow_up_date', 'last_contact_date', 'do_not_contact', 'notes'];
+// Columns every QuoteTend CSV has carried since the first release. Imports must still include them.
+export const LEGACY_COLUMNS = ['estimate_id', 'customer_name', 'customer_email', 'job_description', 'amount_usd', 'estimate_date', 'status', 'next_follow_up_date', 'last_contact_date', 'do_not_contact', 'notes'];
+// Optional detail fields (schema 3). Older records and files simply lack them; a blank value means
+// "not recorded" and is never filled in with a guess.
+export const OPTIONAL_FIELDS = ['customer_phone', 'address', 'trade'];
+export const FIELD_LIMITS = { customer_phone: 40, address: 300, trade: 80 };
+export const CSV_COLUMNS = [...LEGACY_COLUMNS, ...OPTIONAL_FIELDS];
+// Suggestions only: contractors may enter any trade or service category.
+export const TRADES = ['Roofing', 'Siding', 'Windows & doors', 'Gutters', 'Exterior remodel'];
+export const CHANNELS = ['Email', 'Phone', 'Text', 'Other'];
+// Optional owner-reported result of a logged contact. Every option is a real contact with the customer.
+export const CONTACT_RESULTS = Object.freeze({ spoke: 'Spoke with customer', left_message: 'Left a message', messaged: 'Sent a message' });
+export const withOptionalFields = q => ({ ...q, ...Object.fromEntries(OPTIONAL_FIELDS.map(k => [k, q[k] ?? ''])) });
 export const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 export function addDays(date, days) { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); }
 export function validDate(value) { if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false; const d = new Date(`${value}T12:00:00Z`); return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === value; }
@@ -10,15 +22,23 @@ export function optOutSources(q, quotes = [q]) {
 }
 export const eligible = (q, quotes = [q]) => q.status === 'sent' && !q.do_not_contact && optOutSources(q, quotes).length === 0;
 export const due = (q, today = todayISO(), quotes = [q]) => eligible(q, quotes) && !!q.next_follow_up_date && q.next_follow_up_date <= today;
+export const daysBetween = (from, to) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400000);
 export function normalizeWorkspace(quotes) {
   return quotes.map(q => ({ ...normalize(q), next_follow_up_date: eligible(q, quotes) ? q.next_follow_up_date || '' : '' }));
 }
+const FIELD_NAMES = { customer_phone: 'Phone', address: 'Project address', trade: 'Trade or service' };
+const PHONE = /^\+?[0-9().\-\s/]{3,32}(?:\s*(?:x|ext\.?|#)\s*\d{1,6})?$/i;
 export function validateEstimate(q) {
   const errors = [];
   if (!q || typeof q !== 'object' || Array.isArray(q)) return ['Estimate must be an object'];
-  for (const key of CSV_COLUMNS.filter(k => !['amount_usd', 'do_not_contact'].includes(k))) {
+  for (const key of LEGACY_COLUMNS.filter(k => !['amount_usd', 'do_not_contact'].includes(k))) {
     if (typeof q[key] !== 'string') errors.push(`${key.replaceAll('_', ' ')} must be text`);
   }
+  for (const key of OPTIONAL_FIELDS) {
+    if (q[key] !== undefined && typeof q[key] !== 'string') errors.push(`${FIELD_NAMES[key]} must be text`);
+    else if (q[key] && q[key].length > FIELD_LIMITS[key]) errors.push(`${FIELD_NAMES[key]} must be at most ${FIELD_LIMITS[key]} characters`);
+  }
+  if (typeof q.customer_phone === 'string' && q.customer_phone && (!PHONE.test(q.customer_phone) || (q.customer_phone.match(/\d/g) || []).length < 3)) errors.push('Phone must use digits with optional + ( ) - . / spaces and an extension such as x12');
   for (const key of ['estimate_id', 'customer_name', 'job_description']) if (!String(q[key] || '').trim()) errors.push(`${key.replaceAll('_', ' ')} is required`);
   if (!Number.isFinite(q.amount_usd) || q.amount_usd < 0 || q.amount_usd > 999999999.99 || Math.abs(q.amount_usd * 100 - Math.round(q.amount_usd * 100)) > 0.00001) errors.push('Amount must be between 0 and 999,999,999.99 with at most two decimal places');
   if (!STATUSES.includes(q.status)) errors.push('Status must be draft, sent, won, or lost');
@@ -31,7 +51,7 @@ export function validateEstimate(q) {
   for (const k of CSV_COLUMNS) if (typeof q[k] === 'string' && q[k].length > 10000) errors.push(`${k} is too long`);
   return errors;
 }
-export function normalize(q) { return { ...q, next_follow_up_date: eligible(q) ? q.next_follow_up_date || '' : '', history: q.history || [], saved_draft: q.saved_draft || '' }; }
+export function normalize(q) { return { ...withOptionalFields(q), next_follow_up_date: eligible(q) ? q.next_follow_up_date || '' : '', history: q.history || [], saved_draft: q.saved_draft || '' }; }
 export function parseBackup(text) {
   if (typeof text !== 'string' || text.length > 5_000_000) throw new Error('Backup must be smaller than 5 MB.');
   let data;
@@ -59,12 +79,14 @@ export function draftMessage(q, company = 'Brush & Pine Painting', quotes = [q])
   const amount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(q.amount_usd);
   return `Hi ${q.customer_name.split(' ')[0]},\n\nI wanted to check in on the ${amount} estimate for ${q.job_description.toLowerCase()}. Have you had a chance to look it over?\n\nIf you have any questions or would like to discuss next steps, just let me know. Happy to help.\n\nThanks,\n${company}`;
 }
-export function recordContact(q, { date, nextDate, note, channel }, today = todayISO(), quotes = [q]) {
+export function recordContact(q, { date, nextDate, note, channel, result }, today = todayISO(), quotes = [q]) {
   if (!eligible(q, quotes)) throw new Error('Contact logging is paused for this estimate or shared email.');
   if (!validDate(date) || date > today || date < q.estimate_date) throw new Error('Contact date must fall between the estimate date and today.');
   if (!validDate(nextDate) || nextDate <= date) throw new Error('Choose a next follow-up date after the contact date.');
-  if (!['Email', 'Phone', 'Text', 'Other'].includes(channel)) throw new Error('Choose a contact method.');
-  return { ...q, last_contact_date: [q.last_contact_date || '', date].sort().at(-1), next_follow_up_date: nextDate, history: [...q.history, { type: 'contact', at: new Date().toISOString(), date, text: `${channel} contact recorded${note.trim() ? ` — ${note.trim()}` : ''}` }] };
+  if (!CHANNELS.includes(channel)) throw new Error('Choose a contact method.');
+  if (result !== undefined && result !== '' && !Object.hasOwn(CONTACT_RESULTS, result)) throw new Error('Choose a listed contact result or leave it blank.');
+  const label = result ? ` · ${CONTACT_RESULTS[result]}` : '';
+  return { ...q, last_contact_date: [q.last_contact_date || '', date].sort().at(-1), next_follow_up_date: nextDate, history: [...q.history, { type: 'contact', at: new Date().toISOString(), date, text: `${channel} contact recorded${label}${note.trim() ? ` — ${note.trim()}` : ''}` }] };
 }
 // RFC 4180-style parser: handles quoted commas, escaped quotes, CRLF and multiline notes.
 export function parseCSV(text) {
@@ -88,10 +110,10 @@ export function parseCSV(text) {
 export function previewImport(text, existing = []) {
   const [header, ...rows] = parseCSV(text); const columns = header.map(h => h.trim());
   if (new Set(columns).size !== columns.length) throw new Error('CSV contains duplicate column names.');
-  const missing = CSV_COLUMNS.filter(c => !columns.includes(c));
+  const missing = LEGACY_COLUMNS.filter(c => !columns.includes(c));
   if (missing.length) throw new Error(`Missing columns: ${missing.join(', ')}.`);
   const result = rows.map((r, index) => {
-    const raw = Object.fromEntries(columns.map((c, i) => [c, (r[i] || '').trim()]));
+    const raw = { ...Object.fromEntries(OPTIONAL_FIELDS.map(c => [c, ''])), ...Object.fromEntries(columns.map((c, i) => [c, (r[i] || '').trim()])) };
     const bool = raw.do_not_contact.toLowerCase();
     const q = { ...Object.fromEntries(CSV_COLUMNS.map(k => [k, raw[k]])), amount_usd: raw.amount_usd === '' ? NaN : Number(raw.amount_usd), do_not_contact: bool === 'true' ? true : bool === 'false' ? false : null, history: [] };
     const errors = validateEstimate(q);
@@ -102,7 +124,7 @@ export function previewImport(text, existing = []) {
     if (!eligible(q) && q.next_follow_up_date) warnings.push('Follow-up date will be cleared for draft, closed, or opted-out estimate');
     return { row: index + 2, quote: normalize(q), original: q, errors, warnings, outcome: errors.length ? 'invalid' : 'ready' };
   });
-  const signature = q => JSON.stringify(CSV_COLUMNS.map(k => k === 'estimate_id' ? q[k].trim().toLowerCase() : typeof q[k] === 'string' ? q[k].trim() : q[k]));
+  const signature = q => JSON.stringify(CSV_COLUMNS.map(k => k === 'estimate_id' ? q[k].trim().toLowerCase() : typeof (q[k] ?? '') === 'string' ? (q[k] ?? '').trim() : q[k]));
   const key = q => q.estimate_id.trim().toLowerCase();
   const groups = new Map();
   for (const r of result.filter(r => !r.errors.length)) { const id = key(r.quote); if (!groups.has(id)) groups.set(id, []); groups.get(id).push(r); }
@@ -155,6 +177,87 @@ const safeCell = value => {
   return `"${s.replaceAll('"', '""')}"`;
 };
 export const exportCSV = quotes => '\uFEFF' + [CSV_COLUMNS.join(','), ...quotes.map(q => CSV_COLUMNS.map(k => safeCell(q[k])).join(','))].join('\r\n');
+// ---------- Dashboard, queue and list rules (shared by the account UI and tests) ----------
+// One follow-up state per estimate. Order of checks matters: closed and draft estimates are never
+// "overdue", and opt-outs (including shared-email opt-outs) pause follow-ups regardless of date.
+export function followupState(q, today = todayISO(), quotes = [q]) {
+  if (q.status === 'draft') return 'draft';
+  if (q.status === 'won' || q.status === 'lost') return 'closed';
+  if (!eligible(q, quotes)) return 'paused';
+  if (!q.next_follow_up_date) return 'unscheduled';
+  if (q.next_follow_up_date < today) return 'overdue';
+  if (q.next_follow_up_date === today) return 'today';
+  return 'upcoming';
+}
+// Estimates whose last recorded contact falls within the last `days` days (including today), newest first.
+export function recentlyContacted(quotes, today = todayISO(), days = 14) {
+  const since = addDays(today, -(days - 1));
+  return quotes.filter(q => q.last_contact_date && q.last_contact_date >= since && q.last_contact_date <= today)
+    .sort((a, b) => b.last_contact_date.localeCompare(a.last_contact_date) || a.customer_name.localeCompare(b.customer_name));
+}
+export function queues(quotes, today = todayISO()) {
+  const candidates = quotes.filter(q => eligible(q, quotes));
+  const byDate = (a, b) => a.next_follow_up_date.localeCompare(b.next_follow_up_date) || b.amount_usd - a.amount_usd;
+  return {
+    due: candidates.filter(q => due(q, today, quotes)).sort(byDate),
+    upcoming: candidates.filter(q => q.next_follow_up_date > today).sort(byDate),
+    unscheduled: candidates.filter(q => !q.next_follow_up_date).sort((a, b) => a.estimate_date.localeCompare(b.estimate_date)),
+    contacted: recentlyContacted(quotes, today)
+  };
+}
+// Open (sent) estimate value split by follow-up state. Buckets always sum to metrics().openValue.
+export function pipelineByState(quotes, today = todayISO()) {
+  const out = Object.fromEntries(['overdue', 'today', 'upcoming', 'unscheduled', 'paused'].map(k => [k, { count: 0, value: 0 }]));
+  for (const q of quotes.filter(q => q.status === 'sent')) { const s = followupState(q, today, quotes); out[s].count++; out[s].value += q.amount_usd; }
+  return out;
+}
+export function ageBuckets(quotes, today = todayISO()) {
+  const buckets = [['0–7 days', 0, 7], ['8–14 days', 8, 14], ['15–30 days', 15, 30], ['31+ days', 31, Infinity]].map(([label, min, max]) => ({ label, min, max, count: 0, value: 0 }));
+  for (const q of quotes.filter(q => q.status === 'sent')) {
+    const age = Math.max(0, daysBetween(q.estimate_date, today));
+    const b = buckets.find(b => age >= b.min && age <= b.max); b.count++; b.value += q.amount_usd;
+  }
+  return buckets;
+}
+export function statusTotals(quotes) {
+  const out = Object.fromEntries(STATUSES.map(s => [s, { count: 0, value: 0 }]));
+  for (const q of quotes) { out[q.status].count++; out[q.status].value += q.amount_usd; }
+  return out;
+}
+// Distinct trades recorded on this account plus the standard suggestions, for filters and inputs.
+export function tradeOptions(quotes) {
+  const used = [...new Set(quotes.map(q => (q.trade || '').trim()).filter(Boolean))];
+  return { used: used.sort((a, b) => a.localeCompare(b)), suggestions: [...new Set([...TRADES, ...used])] };
+}
+const digits = s => String(s || '').replace(/\D/g, '');
+// Search only fields that are stored on the estimate. Every term must match; digit-only terms also
+// match phone numbers regardless of punctuation.
+export function filterEstimates(quotes, { query = '', status = 'all', followup = 'any', trade = 'all', sort = 'followup' } = {}, today = todayISO()) {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const rank = { overdue: 0, today: 1, upcoming: 2, unscheduled: 3, paused: 4, draft: 5, closed: 6 };
+  const list = quotes.filter(q => {
+    if (terms.length) {
+      const hay = [q.estimate_id, q.customer_name, q.job_description, q.trade, q.address, q.customer_email, q.customer_phone, q.notes].join(' ').toLowerCase();
+      const phone = digits(q.customer_phone);
+      if (terms.some(t => !hay.includes(t) && !(/^[\d()+.\-]+$/.test(t) && digits(t).length >= 3 && phone.includes(digits(t))))) return false;
+    }
+    if (status === 'optout') { if (!optOutSources(q, quotes).length) return false; }
+    else if (status !== 'all' && q.status !== status) return false;
+    if (trade === '__none') { if ((q.trade || '').trim()) return false; }
+    else if (trade !== 'all' && (q.trade || '').trim().toLowerCase() !== trade.toLowerCase()) return false;
+    if (followup === 'due') return due(q, today, quotes);
+    if (followup !== 'any' && followupState(q, today, quotes) !== followup) return false;
+    return true;
+  });
+  const sorters = {
+    followup: (a, b) => rank[followupState(a, today, quotes)] - rank[followupState(b, today, quotes)] || (a.next_follow_up_date || '9').localeCompare(b.next_follow_up_date || '9') || b.amount_usd - a.amount_usd,
+    value: (a, b) => b.amount_usd - a.amount_usd || a.customer_name.localeCompare(b.customer_name),
+    newest: (a, b) => b.estimate_date.localeCompare(a.estimate_date) || b.estimate_id.localeCompare(a.estimate_id),
+    oldest: (a, b) => a.estimate_date.localeCompare(b.estimate_date) || a.estimate_id.localeCompare(b.estimate_id),
+    name: (a, b) => a.customer_name.localeCompare(b.customer_name) || a.estimate_id.localeCompare(b.estimate_id)
+  };
+  return list.sort(sorters[sort] || sorters.followup);
+}
 export function demoData(today = todayISO()) {
   const seeds = [
     ['QT-1001', 'Mara Ellis', 'mara.ellis@example.com', 'Exterior repaint · two-story home', 6800, -18, 'sent', -4, false, 'Warm white siding with sage trim. Asked about the prep process.'],
@@ -170,5 +273,5 @@ export function demoData(today = todayISO()) {
     ['QT-1011', 'June Rowan', 'june.rowan@example.com', 'Home office repaint', 1450, -15, 'sent', null, true, 'Customer requested no more follow-ups.'],
     ['QT-1012', 'Maple House Studio', 'studio@example.com', 'Commercial studio repaint', 28500, -6, 'sent', null, false, 'Owner said, "Let’s review the timeline, then the colors."']
   ];
-  return seeds.map(([estimate_id, customer_name, customer_email, job_description, amount_usd, age, status, next, do_not_contact, notes]) => ({ estimate_id, customer_name, customer_email, job_description, amount_usd, estimate_date: addDays(today, age), status, next_follow_up_date: next === null ? '' : addDays(today, next), last_contact_date: '', do_not_contact, notes, saved_draft: '', history: [{ type: 'created', at: `${addDays(today, age)}T12:00:00`, text: 'Fictional demo estimate added' }] }));
+  return seeds.map(([estimate_id, customer_name, customer_email, job_description, amount_usd, age, status, next, do_not_contact, notes]) => ({ estimate_id, customer_name, customer_email, job_description, amount_usd, estimate_date: addDays(today, age), status, next_follow_up_date: next === null ? '' : addDays(today, next), last_contact_date: '', do_not_contact, notes, customer_phone: '', address: '', trade: '', saved_draft: '', history: [{ type: 'created', at: `${addDays(today, age)}T12:00:00`, text: 'Fictional demo estimate added' }] }));
 }

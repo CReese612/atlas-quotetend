@@ -84,7 +84,7 @@ test('schema 1 to 2 preserves data/events and produces a pre-security copy',t=>{
  store.db.exec('DROP TABLE recovery_codes; DROP TABLE invitations; PRAGMA user_version=1;');store.close();
  const copy=join(dir,'copy.sqlite');copyFileSync(path,copy);store=openAccounts(copy);
  assert.equal(store.db.prepare('SELECT quotes FROM businesses').get().quotes,bytes);assert.equal(store.ownerById(owner.id).password_hash,'fictional-hash');assert.equal(store.events(owner.business_id).length,0);
- assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,2);store.close();
+ assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,3);store.close();
  assert.equal(readdirSync(dir).filter(n=>n.includes('.pre-security-')).length,1);
  const old=new DatabaseSync(path,{readOnly:true});assert.equal(old.prepare('PRAGMA user_version').get().user_version,1);old.close();
 });
@@ -96,7 +96,7 @@ test('consistent online backup verifies and reopens with credentials, events and
  issueRecovery(store.db,owner.id);
  const pending=makeBackup(store.db,join(dir,'backups'));
  store.command(owner,{kind:'edit',requestId:crypto.randomUUID(),revision:1,estimateId:'BACKUP',fields:{notes:'Concurrent fictional edit'}});
- const file=await pending;assert.equal(verifyBackup(file).version,2);
+ const file=await pending;assert.equal(verifyBackup(file).version,3);
  const restoredPath=join(dir,'restored.sqlite');
  execFileSync(process.execPath,['backup-accounts.mjs','restore-copy',file,restoredPath]);
  assert.throws(()=>execFileSync(process.execPath,['backup-accounts.mjs','restore-copy',file,restoredPath],{stdio:'pipe'}));

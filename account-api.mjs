@@ -88,7 +88,9 @@ export async function accountAPI(store, port, config={}) {
     if(store.ownerById(req.owner.id).password_hash!==req.owner.password_hash)return res.status(409).json({error:'Sign in again.'});
     res.json({code:issueRecovery(store.db,req.owner.id)});
   });
-  api.get('/me', (req, res) => res.json({ email: req.owner.email, businessId: req.owner.business_id }));
+  api.get('/me', (req, res) => res.json({ email: req.owner.email, businessId: req.owner.business_id,
+    businessName: store.workspace(req.owner.business_id)?.businessName || '',
+    recoveryCodeSaved: !!store.db.prepare('SELECT 1 FROM recovery_codes WHERE owner_id=?').get(req.owner.id) }));
   api.use('/workspaces/:businessId', (req, res, next) => {
     // Trust only the session's owner, never caller-supplied business/owner IDs.
     if (req.params.businessId !== req.owner.business_id) return res.status(404).json({ error: 'Workspace not found.' });
@@ -98,7 +100,7 @@ export async function accountAPI(store, port, config={}) {
 
   api.put('/workspaces/:businessId', (req,res)=>res.status(405).json({error:'Reload QuoteTend. Whole-workspace saves are disabled; use focused operations or explicit restore.'}));
   api.post('/workspaces/:businessId/commands', (req,res)=>{
-    try {res.json(store.command(req.owner,req.body));} catch(e) {if(e.status)res.status(e.status).json({error:e.message});else throw e;}
+    try {res.json(store.command(req.owner,req.body));} catch(e) {if(e.status)res.status(e.status).json({error:e.message,...(e.code?{code:e.code}:{})});else throw e;}
   });
   api.get('/workspaces/:businessId/results', (req,res)=>{
     try {res.json(store.results(req.owner.business_id,req.query.from,req.query.to));}catch(e){res.status(400).json({error:e.message});}

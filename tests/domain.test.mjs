@@ -63,8 +63,11 @@ test('closed and opted-out CSV rows have dates cleared with a warning', () => {
   assert.equal(rows[0].quote.next_follow_up_date, ''); assert.equal(rows[0].warnings.length, 1);
 });
 test('CSV neutralizes spreadsheet formula cells', () => {
+  // Locate columns by header: optional detail columns follow notes in schema 3 exports.
+  const column = name => CSV_COLUMNS.indexOf(name);
   for (const notes of ['=HYPERLINK("bad")', '+cmd', '-cmd', '@SUM(A1)', ' \t=1+1']) {
-    assert.ok(parseCSV(exportCSV([{ ...seed()[0], notes }]))[1].at(-1).startsWith("'"));
+    assert.ok(parseCSV(exportCSV([{ ...seed()[0], notes }]))[1][column('notes')].startsWith("'"));
+    for (const field of ['customer_phone', 'address', 'trade']) assert.ok(parseCSV(exportCSV([{ ...seed()[0], [field]: notes }]))[1][column(field)].startsWith("'"), field);
   }
 });
 test('draft generation never mutates estimate or contact history', () => {

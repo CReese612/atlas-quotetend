@@ -355,7 +355,11 @@ test('sample CSV import preview matches the private import mapping', () => {
   const real = previewSpreadsheet(sheet, sheet.mapping, { dateFormat: 'mdy', statusMap: { Sent: 'sent' }, optOutReviewed: true }, s.quotes);
   assert.deepEqual(demo.rows.map(r => r.outcome), real.map(r => r.outcome));
   assert.deepEqual(demo.rows.map(r => r.outcome), ['ready', 'ready', 'ready', 'conflict', 'invalid']);
-  assert.deepEqual(Object.fromEntries(Object.entries(demo.mapping).map(([k, v]) => [k, v < 0 ? '' : String(v)])), sheet.mapping);
+  // The demo maps the original columns; the private mapper also offers optional phone, address and trade
+  // columns (schema 3), which the sample file does not contain.
+  assert.deepEqual(Object.fromEntries(Object.entries(demo.mapping).map(([k, v]) => [k, v < 0 ? '' : String(v)])), Object.fromEntries(Object.keys(demo.mapping).map(k => [k, sheet.mapping[k]])));
+  assert.deepEqual(Object.keys(sheet.mapping).filter(k => !(k in demo.mapping)), ['customer_phone', 'address', 'trade']);
+  for (const k of ['customer_phone', 'address', 'trade']) assert.equal(sheet.mapping[k], '');
   for (const [i, r] of demo.rows.entries()) if (r.outcome === 'ready') {
     for (const k of ['estimate_id', 'customer_name', 'job_description', 'amount_usd', 'estimate_date', 'status', 'next_follow_up_date']) assert.equal(r.quote[k], real[i].quote[k], `${r.quote.estimate_id} ${k}`);
   }

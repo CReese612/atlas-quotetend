@@ -33,7 +33,7 @@ test('legacy migration preserves quote bytes, creates no events and snapshots th
   assert.equal(store.db.prepare('SELECT quotes FROM businesses').get().quotes,bytes);
   assert.equal(store.workspace('old-business').revision,12);assert.equal(store.events('old-business').length,0);
   assert.ok(store.workspace('old-business').identities.every(i=>i.origin==='legacy'));
-  assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,2);
+  assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,3);
   store.close();const reopened=openAccounts(disposable);assert.equal(reopened.events('old-business').length,0);reopened.close();
   assert.equal(readdirSync(dir).filter(f=>f.includes('.pre-results-')).length,1);
   old=new DatabaseSync(path);assert.equal(old.prepare('PRAGMA user_version').get().user_version,0);assert.equal(old.prepare('SELECT quotes FROM businesses').get().quotes,bytes);old.close();

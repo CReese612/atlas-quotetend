@@ -6,13 +6,22 @@ import { homedir } from 'node:os';
 import session from 'express-session';
 import { migrateLedger, attachLedger } from './ledger.mjs';
 import { migrateSecurity, tokenHash } from './account-security.mjs';
-import { CSV_COLUMNS, parseBackup } from './domain.js';
+import { CSV_COLUMNS, parseBackup, withOptionalFields } from './domain.js';
 
+export const SCHEMA_VERSION = 3;
+// Schema 3 adds optional phone, project address and trade fields inside the stored estimate JSON.
+// No table or estimate is rewritten; the version bump stops older QuoteTend builds (which would drop
+// those fields on their next save) from opening this database. A pre-migration copy is kept.
+export function migrateDetailFields(db, path) {
+  if (db.prepare('PRAGMA user_version').get().user_version >= 3) return;
+  if (db.prepare('SELECT COUNT(*) n FROM businesses').get().n && path !== ':memory:') db.prepare('VACUUM INTO ?').run(path + '.pre-fields-' + randomUUID() + '.sqlite');
+  db.exec('PRAGMA user_version=3');
+}
 export const defaultDatabase = () => process.env.QUOTETEND_DB || join(process.env.LOCALAPPDATA || join(homedir(), '.local', 'share'), 'QuoteTend', 'accounts.sqlite');
 export function openAccounts(path = defaultDatabase()) {
   mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
-  if (db.prepare('PRAGMA user_version').get().user_version > 2) { db.close(); throw new Error('This database needs a newer QuoteTend version. No changes applied.'); }
+  if (db.prepare('PRAGMA user_version').get().user_version > SCHEMA_VERSION) { db.close(); throw new Error('This database needs a newer QuoteTend version. No changes applied.'); }
   db.exec(`PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS businesses (id TEXT PRIMARY KEY, name TEXT NOT NULL,
@@ -22,7 +31,7 @@ export function openAccounts(path = defaultDatabase()) {
     CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL);`);
   db.prepare('INSERT OR IGNORE INTO metadata VALUES (?, ?)').run('session_secret', randomBytes(48).toString('hex'));
   db.prepare('DELETE FROM sessions WHERE expires <= ?').run(Date.now());
-  try { migrateLedger(db, path); migrateSecurity(db,path); } catch (error) { db.close(); throw error; }
+  try { migrateLedger(db, path); migrateSecurity(db,path); migrateDetailFields(db,path); } catch (error) { db.close(); throw error; }
   const secret = db.prepare('SELECT value FROM metadata WHERE key=?').get('session_secret').value;
   const ownerByEmail = email => db.prepare('SELECT * FROM owners WHERE email=?').get(email);
   const ownerById = id => db.prepare('SELECT * FROM owners WHERE id=?').get(id);
@@ -53,7 +62,8 @@ export function openAccounts(path = defaultDatabase()) {
     },
     workspace(businessId) {
       const row = db.prepare('SELECT * FROM businesses WHERE id=?').get(businessId);
-      return row && { businessId: row.id, businessName: row.name, revision: row.revision, quotes: JSON.parse(row.quotes) };
+      // Older records lack the optional detail fields; present them as blank without rewriting stored JSON.
+      return row && { businessId: row.id, businessName: row.name, revision: row.revision, quotes: JSON.parse(row.quotes).map(withOptionalFields) };
     },
     save(businessId, revision, quotes) {
       return db.prepare('UPDATE businesses SET quotes=?, revision=revision+1 WHERE id=? AND revision=?')

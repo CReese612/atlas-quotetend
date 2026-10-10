@@ -1,0 +1,67 @@
+/* Sign-in and account-security pages. Uses the shared tokens (/shared/tokens.css) and form controls. */
+body.auth { min-height: 100vh; background: var(--ivory); font-size: 15px; }
+.auth-layout { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); min-height: 100vh; }
+.auth-brand { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; padding: 40px 48px; background: radial-gradient(120% 90% at 0% 0%, var(--evergreen-700), var(--evergreen-900) 55%, var(--evergreen-950)); color: #cfe0d4; }
+.auth-brand::after { content: ""; position: absolute; right: -120px; bottom: -120px; width: 360px; height: 360px; border-radius: 50%; border: 1px solid rgb(217 174 95 / 0.18); box-shadow: 0 0 0 40px rgb(217 174 95 / 0.04), 0 0 0 90px rgb(217 174 95 / 0.03); pointer-events: none; }
+.auth-brand a { color: inherit; }
+.auth-logo { display: inline-flex; font-size: 1.9rem; text-decoration: none; color: var(--ivory); }
+.auth-kicker { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-400); margin-bottom: 14px; }
+.auth-hero { font-family: var(--font-display); color: var(--white); font-size: clamp(2rem, 1.4rem + 2vw, 3.1rem); font-weight: 650; letter-spacing: -0.04em; line-height: 1.04; max-width: 13em; }
+.auth-lede { margin-top: 16px; font-size: 1.05rem; line-height: 1.6; max-width: 32em; }
+.auth-points { list-style: none; margin: 28px 0 0; padding: 0; display: grid; gap: 12px; max-width: 30em; }
+.auth-points li { display: flex; gap: 12px; align-items: flex-start; font-size: 0.98rem; line-height: 1.5; }
+.auth-points svg { width: 22px; height: 22px; flex: none; color: var(--gold-400); margin-top: 1px; }
+.auth-note { display: flex; gap: 10px; align-items: center; font-size: 0.88rem; color: #9fbcab; }
+.auth-note i { width: 8px; height: 8px; border-radius: 50%; background: var(--gold-400); flex: none; }
+.auth-panel { display: grid; place-items: center; padding: 40px 24px; }
+.auth-card { width: min(440px, 100%); background: var(--white); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow-lg); padding: 32px 32px 26px; }
+.auth-card h2, .auth-card h1 { font-family: var(--font-display); font-size: 1.9rem; font-weight: 650; letter-spacing: -0.035em; line-height: 1.1; color: var(--ink); }
+.auth-sub { margin-top: 8px; color: var(--text-2); line-height: 1.55; font-size: 0.95rem; }
+.auth-form { display: grid; gap: 14px; margin-top: 22px; }
+.auth-form label { display: grid; gap: 6px; font-size: 0.88rem; font-weight: 600; color: var(--text-2); }
+.auth-form input, .auth-form textarea { height: 46px; border: 1px solid var(--line-2); border-radius: 12px; padding: 0 14px; background: var(--white); color: var(--ink); font-size: 1rem; width: 100%; }
+.auth-form textarea { height: auto; padding: 12px 14px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.9rem; resize: none; }
+.auth-form input:focus, .auth-form textarea:focus { outline: none; border-color: var(--evergreen-600); box-shadow: 0 0 0 3px rgb(31 97 80 / 0.15); }
+.auth-form input[aria-invalid="true"] { border-color: var(--clay-500); }
+.auth-help { font-size: 0.84rem; color: var(--text-3); line-height: 1.5; }
+.auth-error { min-height: 1.2em; color: var(--clay-700); font-weight: 600; font-size: 0.9rem; }
+.auth-error:empty { min-height: 0; }
+.auth-status { color: var(--evergreen-700); font-weight: 600; font-size: 0.9rem; }
+.auth-status.is-error { color: var(--clay-700); }
+.auth-submit { width: 100%; min-height: 48px; border-radius: 12px; font-size: 1rem; }
+.auth-switch { margin-top: 16px; width: 100%; background: none; border: 0; padding: 8px; color: var(--evergreen-600); font-weight: 650; font-size: 0.95rem; }
+.auth-switch:hover { text-decoration: underline; text-underline-offset: 3px; }
+.auth-divider { height: 1px; background: var(--line-soft); margin: 18px 0 14px; }
+.auth-recover summary { cursor: pointer; font-weight: 650; color: var(--text-2); font-size: 0.93rem; }
+.auth-recover[open] summary { margin-bottom: 8px; }
+.auth-recover p { font-size: 0.88rem; color: var(--text-3); line-height: 1.55; margin-top: 8px; }
+.auth-foot { margin-top: 18px; font-size: 0.82rem; color: var(--text-3); text-align: center; line-height: 1.5; }
+
+/* Account security */
+.security-page { max-width: 760px; margin: 0 auto; padding: 32px 24px 80px; display: grid; gap: 20px; }
+.security-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.security-top .wordmark { font-size: 1.6rem; }
+.security-head h1 { font-family: var(--font-display); font-size: clamp(1.8rem, 1.5rem + 1vw, 2.3rem); font-weight: 650; letter-spacing: -0.035em; color: var(--ink); }
+.security-head p { color: var(--text-2); margin-top: 6px; }
+.security-card { background: var(--white); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-xs); padding: 24px; }
+.security-card h2 { display: flex; align-items: center; gap: 10px; font-size: 1.15rem; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+.security-card h2 svg { width: 22px; height: 22px; color: var(--green-500); }
+.security-card > p { margin-top: 8px; color: var(--text-2); line-height: 1.6; font-size: 0.95rem; }
+.security-card .auth-form { margin-top: 16px; max-width: 420px; }
+.security-card .auth-submit { width: auto; padding: 0 22px; justify-self: start; }
+.code-result { margin-top: 16px; padding: 16px; border-radius: 14px; background: #fdf8ee; border: 1px solid var(--gold-200); }
+.code-result p { color: #6b4d16; font-weight: 600; font-size: 0.92rem; margin-bottom: 10px; }
+
+@media (max-width: 900px) {
+  .auth-layout { grid-template-columns: 1fr; }
+  .auth-brand { padding: 28px 22px 30px; gap: 22px; }
+  .auth-hero { font-size: 2rem; }
+  .auth-points, .auth-note { display: none; }
+  .auth-lede { font-size: 0.98rem; margin-top: 10px; }
+  .auth-panel { padding: 24px 16px 48px; place-items: start center; }
+  .auth-card { padding: 24px 20px 20px; border-radius: 18px; }
+}
+@media (max-width: 480px) {
+  .security-page { padding: 20px 16px 60px; }
+  .security-card { padding: 18px; }
+}

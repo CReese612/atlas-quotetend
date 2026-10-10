@@ -17,7 +17,7 @@ const M = metrics(seed.quotes, today), S = pipelineByState(seed.quotes, today);
 
 const server = await startPublicServer({ port: 0 });
 const base = server.url;
-const browser = await chromium.launch({ channel: process.env.QUOTETEND_BROWSER || 'msedge', headless: true });
+const browser = await chromium.launch({ ...(process.env.QUOTETEND_BROWSER_PATH ? { executablePath: process.env.QUOTETEND_BROWSER_PATH } : { channel: process.env.QUOTETEND_BROWSER || 'msedge' }), headless: true });
 const results = [];
 const shots = [];
 // The shipped config points at QuoteTend's real Formspree form. Every context aborts and records
@@ -223,7 +223,7 @@ try {
   await group('early access (public host): no endpoint → honest "open soon"; official endpoint → live form without developer notes', async () => {
     // Map a non-local hostname onto the preview server so the page behaves as it would when deployed.
     const port = new URL(base).port;
-    const publicBrowser = await chromium.launch({ channel: process.env.QUOTETEND_BROWSER || 'msedge', headless: true, args: ['--host-resolver-rules=MAP public.quotetend-fixture.net 127.0.0.1'] });
+    const publicBrowser = await chromium.launch({ ...(process.env.QUOTETEND_BROWSER_PATH ? { executablePath: process.env.QUOTETEND_BROWSER_PATH } : { channel: process.env.QUOTETEND_BROWSER || 'msedge' }), headless: true, args: ['--host-resolver-rules=MAP public.quotetend-fixture.net 127.0.0.1'] });
     try {
       const unconfigured = await publicBrowser.newContext({ viewport: { width: 1440, height: 900 } });
       await blockLiveFormService(unconfigured);
