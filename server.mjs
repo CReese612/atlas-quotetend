@@ -36,8 +36,10 @@ export async function startServer({ port = Number(process.env.PORT || 4173), dbP
     res.on('finish',()=>{if(res.statusCode>=500)logger({event:'request_failed',requestId,status:res.statusCode,method:req.method});});
     res.set({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
       'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
+    if(config.noindex)res.set('X-Robots-Tag','noindex, nofollow, noarchive');
     next();
   });
+  if(config.noindex)app.get('/robots.txt',(req,res)=>res.type('text/plain').send('User-agent: *\nDisallow: /\n'));
   app.get('/healthz',(req,res)=>{let ok=false;try{store.db.prepare('SELECT 1').get();ok=backups.healthy();}catch{}res.status(ok?200:503).json({status:ok?'ok':'unhealthy'});});
   app.use('/api', await accountAPI(store, port,config));
   app.use(async (req, res) => {

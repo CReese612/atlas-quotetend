@@ -1,0 +1,47 @@
+# QA STAGING ONLY. PREPARED, NOT APPLIED. Creating this Blueprint provisions a PAID web service and disk
+# and requires explicit owner approval (see docs/STAGING_QA.md). It is deliberately NOT named render.yaml:
+# Render only auto-detects render.yaml at the repository root, which stays the (also unapplied) pilot file.
+# When creating the Blueprint, set its file path to staging/render.staging.yaml.
+# Nothing here references the pilot service, its disk, database path or any secret value.
+services:
+  - type: web
+    name: quotetend-staging-qa
+    runtime: node
+    region: ohio
+    plan: starter
+    numInstances: 1
+    autoDeployTrigger: off
+    buildCommand: npx --yes pnpm@10.14.0 install --frozen-lockfile --prod
+    startCommand: node server.mjs
+    healthCheckPath: /healthz
+    maxShutdownDelaySeconds: 60
+    disk:
+      name: quotetend-staging-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: TZ
+        value: America/Chicago
+      # Prompted at creation; never committed. https://<service>.onrender.com, no path.
+      - key: PUBLIC_ORIGIN
+        sync: false
+      # Prompted at creation; must be a fresh random value of 48+ characters, never the pilot's.
+      - key: SESSION_SECRET
+        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: QUOTETEND_DB
+        value: /var/data/quotetend-staging.sqlite
+      - key: QUOTETEND_BACKUP_DIR
+        value: /var/data/staging-backups
+      - key: QUOTETEND_NOINDEX
+        value: "1"
+      - key: QUOTETEND_STAGING
+        value: "1"
+      # Email of the single QA owner (use a fictional or throwaway address). Used only by staging/seed-qa.mjs.
+      - key: QA_OWNER_EMAIL
+        sync: false

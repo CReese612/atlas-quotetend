@@ -39,3 +39,8 @@ app/fonts/LICENSE-BricolageGrotesque.txt
 public-site/assets/css/tokens.css
 public-site/assets/css/app.css
 public-site/assets/favicon.svg
+
+# QA staging only (see docs/STAGING_QA.md; not part of the pilot service)
+staging/qa-data.mjs
+staging/seed-qa.mjs
+staging/render.staging.yaml

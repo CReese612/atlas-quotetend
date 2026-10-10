@@ -6,5 +6,6 @@ export function configuration(env=process.env) {
  if(!env.SESSION_SECRET || env.SESSION_SECRET.length<48)throw new Error('Set a random SESSION_SECRET of at least 48 characters.');
  if(!env.QUOTETEND_DB || !env.QUOTETEND_BACKUP_DIR)throw new Error('Persistent database and backup paths are required.');
  if(env.TRUST_PROXY_HOPS!=='1')throw new Error('This deployment requires exactly one trusted reverse proxy.');
- return {production:true,host:'0.0.0.0',origin:origin.origin,secret:env.SESSION_SECRET,backupDir:env.QUOTETEND_BACKUP_DIR};
+ // Staging only: QUOTETEND_NOINDEX=1 adds X-Robots-Tag and a disallow-all robots.txt. A courtesy, not access control.
+ return {production:true,host:'0.0.0.0',origin:origin.origin,secret:env.SESSION_SECRET,backupDir:env.QUOTETEND_BACKUP_DIR,noindex:env.QUOTETEND_NOINDEX==='1'};
 }
