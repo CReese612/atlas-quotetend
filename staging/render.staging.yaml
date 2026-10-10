@@ -14,7 +14,6 @@ services:
     buildCommand: npx --yes pnpm@10.14.0 install --frozen-lockfile --prod
     startCommand: node server.mjs
     healthCheckPath: /healthz
-    maxShutdownDelaySeconds: 60
     disk:
       name: quotetend-staging-data
       mountPath: /var/data
