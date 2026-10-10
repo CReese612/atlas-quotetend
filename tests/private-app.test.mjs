@@ -15,11 +15,27 @@ import { startServer } from '../server.mjs';
 
 const today = D.todayISO();
 const base = { ...D.demoData(today)[0], estimate_id: 'F-1', estimate_date: D.addDays(today, -20), history: [], saved_draft: '' };
+// node:test runs t.after hooks in registration order, so a directory removed by one hook is removed while any
+// handle registered later is still open. On Windows an open SQLite file cannot be deleted (EPERM). Each test
+// therefore has ONE hook: it awaits every registered closer, newest first, and only then removes the directory.
+const closers = new WeakMap();
+const closeBeforeRemoval = (t, close) => { closers.get(t).push(close); };
 const temp = t => {
   const dir = mkdtempSync(join(tmpdir(), 'quotetend-private-app-test-'));
-  t.after(() => { if (dirname(dir) === tmpdir() && basename(dir).startsWith('quotetend-private-app-test-')) rmSync(dir, { recursive: true, force: true }); });
+  const pending = []; closers.set(t, pending);
+  t.after(async () => {
+    const failures = [];
+    for (const close of pending.reverse()) { try { await close(); } catch (error) { failures.push(error); } }
+    // A removal failure must not hide a closer failure (the usual cause of a Windows EPERM), so both are reported.
+    if (dirname(dir) === tmpdir() && basename(dir).startsWith('quotetend-private-app-test-')) { try { rmSync(dir, { recursive: true, force: true }); } catch (error) { failures.push(error); } }
+    if (failures.length) throw new AggregateError(failures, 'test resources failed to close');
+  });
   return dir;
 };
+// Open a store whose handle is released before the directory is removed, even if an assertion throws first.
+const openStore = (t, path) => { const store = openAccounts(path); closeBeforeRemoval(t, () => { if (store.db.isOpen) store.close(); }); return store; };
+// Read-only inspection of a database file; the handle is always closed so the file can be removed on Windows.
+const inspect = (path, sql) => { const db = new DatabaseSync(path, { readOnly: true }); try { return db.prepare(sql).get(); } finally { db.close(); } };
 const legacyShape = q => { const copy = { ...q }; for (const k of D.OPTIONAL_FIELDS) delete copy[k]; return copy; };
 const csvCell = v => `"${String(v).replaceAll('"', '""')}"`;
 
@@ -137,15 +153,15 @@ test('contact results are optional, validated and kept in the activity text', ()
 
 test('schema 3 migration keeps stored estimates byte-for-byte, snapshots first and refuses newer databases', t => {
   const dir = temp(t), path = join(dir, 'v2.sqlite');
-  let store = openAccounts(path);
+  let store = openStore(t, path);
   const owner = store.createOwner('legacy@example.com', 'fictional-hash', 'Legacy Fictional Roofing');
   const legacyQuotes = [legacyShape({ ...base, estimate_id: 'OLD-1', status: 'sent', next_follow_up_date: today })];
   store.save(owner.business_id, 0, legacyQuotes);
   store.db.exec('PRAGMA user_version=2'); store.close();
-  const bytes = new DatabaseSync(path, { readOnly: true }).prepare('SELECT quotes FROM businesses').get().quotes;
+  const bytes = inspect(path, 'SELECT quotes FROM businesses').quotes;
   assert.doesNotMatch(bytes, /customer_phone/);
   const copy = join(dir, 'copy.sqlite'); copyFileSync(path, copy);
-  store = openAccounts(copy);
+  store = openStore(t, copy);
   assert.equal(SCHEMA_VERSION, 3);
   assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 3);
   assert.equal(readdirSync(dir).filter(n => n.startsWith('copy.sqlite.pre-fields-')).length, 1);
@@ -155,18 +171,18 @@ test('schema 3 migration keeps stored estimates byte-for-byte, snapshots first a
   const saved = store.command(owner, { kind: 'edit', requestId: crypto.randomUUID(), revision: w.revision, estimateId: 'OLD-1', fields: { customer_phone: '555-0100', trade: 'Roofing' } });
   assert.deepEqual([saved.quotes[0].customer_phone, saved.quotes[0].trade, saved.quotes[0].address], ['555-0100', 'Roofing', '']);
   store.close();
-  store = openAccounts(copy);
+  store = openStore(t, copy);
   assert.equal(store.workspace(owner.business_id).quotes[0].customer_phone, '555-0100', 'persists across reopen');
   assert.equal(readdirSync(dir).filter(n => n.startsWith('copy.sqlite.pre-fields-')).length, 1, 'migration runs once');
   store.close();
-  assert.equal(new DatabaseSync(path, { readOnly: true }).prepare('PRAGMA user_version').get().user_version, 2, 'the original file is untouched');
+  assert.equal(inspect(path, 'PRAGMA user_version').user_version, 2, 'the original file is untouched');
   const newer = join(dir, 'newer.sqlite'); copyFileSync(copy, newer);
   const raw = new DatabaseSync(newer); raw.exec('PRAGMA user_version=4'); raw.close();
   assert.throws(() => openAccounts(newer), /newer QuoteTend version/);
 });
 
 test('ledger commands write typed, plain-language activity and reject stale or invalid input', t => {
-  const store = openAccounts(join(temp(t), 'ledger.sqlite')); t.after(() => store.close());
+  const store = openStore(t, join(temp(t), 'ledger.sqlite'));
   const owner = store.createOwner('ledger@example.com', 'fictional-hash', 'Ledger Fictional');
   let w = store.workspace(owner.business_id);
   const cmd = c => { w = store.command(owner, { requestId: crypto.randomUUID(), revision: w.revision, ...c }); return w; };
@@ -204,7 +220,7 @@ test('ledger commands write typed, plain-language activity and reject stale or i
 });
 
 test('reporting stays consistent after create, contact, amount edits, outcomes, reopen and import', t => {
-  const store = openAccounts(join(temp(t), 'report.sqlite')); t.after(() => store.close());
+  const store = openStore(t, join(temp(t), 'report.sqlite'));
   const owner = store.createOwner('report@example.com', 'fictional-hash', 'Report Fictional');
   let w = store.workspace(owner.business_id);
   const cmd = c => { w = store.command(owner, { requestId: crypto.randomUUID(), revision: w.revision, ...c }); return w; };
@@ -239,7 +255,7 @@ test('reporting stays consistent after create, contact, amount edits, outcomes, 
 test('private app routes: redirect, strict CSP, shared design system, fonts and nothing else', async t => {
   const dir = temp(t);
   const running = await startServer({ port: 0, dbPath: join(dir, 'routes.sqlite'), logger: () => {} });
-  t.after(() => running.close());
+  closeBeforeRemoval(t, () => running.close());
   const origin = `http://127.0.0.1:${running.port}`;
   const get = (path, init = {}) => fetch(origin + path, { redirect: 'manual', ...init });
   const root = await get('/');

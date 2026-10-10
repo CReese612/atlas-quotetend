@@ -1,4 +1,4 @@
-import { eligible, validDate } from './domain.js';
+import { eligible, validDate, addDays } from './domain.js';
 
 // Apply amendments without deleting original evidence or changing recording order.
 export function contactEvidence(events) {
@@ -49,4 +49,32 @@ export function followupResults({ quotes, events, identities, startedAt, epoch }
       open:cohort.filter(r=>r.outcome==='open').length, unknown:cohort.filter(r=>r.outcome==='unknown').length },
     values:{ followed:sum(cohort,'followedValue'), won:sum(won,'wonValue'), overdue:sum(overdue,'value') },
     incomplete:identities.filter(i=>i.origin!=='created' && current.has(i.estimateId.toLowerCase())).length };
+}
+
+// Eight calendar weeks ending today, oldest first. Every reported contact counts on the date the owner gave it,
+// including repeat contacts and entries dated before this reporting period began.
+export function contactsPerWeek(contacts, today) {
+  return Array.from({ length: 8 }, (_, i) => {
+    const end = addDays(today, -7 * (7 - i)), start = addDays(end, -6);
+    return { start, end, count: contacts.filter(c => c.date >= start && c.date <= end).length };
+  });
+}
+
+// Caption for the weekly contact chart. `weeks` are { start, end, count } in calendar dates; `startedAt` is when this
+// reporting period began. QuoteTend can only have recorded activity from that date on, so a contact dated before it
+// was entered afterwards by the owner (backdated). Those counts are kept and shown, but a week before the period
+// is never evidence of zero activity: an empty one just means nothing was entered. Returns null when every
+// displayed week lies inside the period, otherwise { kind, text }.
+export function weeklyCoverage(weeks, startedAt, format = date => date) {
+  const started = String(startedAt).slice(0, 10);
+  if (!weeks.length || !(started > weeks[0].start)) return null;
+  const earlier = weeks.filter(w => w.end < started);
+  const backdated = earlier.reduce((total, w) => total + w.count, 0);
+  const since = `This reporting period began ${format(started)}.`;
+  if (!earlier.length)
+    return { kind: 'partial', text: `${since} The first week shown started before then, so any contacts it shows on earlier days are ones you entered with earlier dates.` };
+  const subject = earlier.length === 1 ? 'The earlier week shows' : `The ${earlier.length} earlier weeks show`;
+  if (backdated)
+    return { kind: 'backdated', text: `${since} ${subject} only the ${backdated} ${backdated === 1 ? 'contact' : 'contacts'} you entered with earlier dates. They are kept as entered, but QuoteTend was not recording then, so those weeks may be incomplete.` };
+  return { kind: 'uncovered', text: `${since} ${subject} 0 because nothing was entered for them, not because no follow-up happened. Contacts you enter with earlier dates will appear here.` };
 }

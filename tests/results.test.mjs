@@ -6,7 +6,7 @@ import {join,dirname,basename} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {openAccounts} from '../account-store.mjs';
 import {demoData,todayISO,addDays} from '../domain.js';
-import {followupResults} from '../results.js';
+import {followupResults,contactsPerWeek,weeklyCoverage} from '../results.js';
 
 const today=todayISO(), yesterday=addDays(today,-1), monthAgo=addDays(today,-30);
 function fixture(t) {
@@ -134,4 +134,49 @@ test('ordinary commands cannot forge client history, draft contacts or estimate 
   f.command('edit',{estimateId:'A',fields:{estimate_id:'B',history:[],last_contact_date:today}});
   assert.equal(f.state().quotes[0].estimate_id,'A');assert.equal(f.state().quotes[0].last_contact_date,'');
   f.command('draft',{estimateId:'A',text:'A fictional draft'});assert.equal(f.report().counts.contacts,0);
+});
+
+const weeksFor=(counts,end=today)=>counts.map((count,i)=>{const last=addDays(end,-7*(counts.length-1-i));return {start:addDays(last,-6),end:last,count};});
+
+test('weekly coverage caption separates owner-entered backdated contacts from weeks that were never recorded',()=>{
+  const weeks=weeksFor([4,3,6,5,0,0,0,2]),format=d=>'<'+d+'>';
+  // The period began inside the last week, so every earlier week precedes it (the QA scenario: nonzero history, empty recent weeks).
+  const began=weeks[7].start,backdated=weeklyCoverage(weeks,began+'T10:00:00.000Z',format);
+  assert.equal(backdated.kind,'backdated');
+  assert.match(backdated.text,new RegExp('began <'+began+'>'));
+  assert.match(backdated.text,/7 earlier weeks show only the 18 contacts you entered with earlier dates/);
+  assert.match(backdated.text,/may be incomplete/);
+  assert.doesNotMatch(backdated.text,/no recorded evidence|no activity|nothing happened/i,'never denies the counts the chart displays');
+  // Weeks before the period with nothing entered are uncovered, not confirmed zero.
+  const empty=weeklyCoverage(weeksFor([0,0,0,0,0,0,0,2]),began,format);
+  assert.equal(empty.kind,'uncovered');
+  assert.match(empty.text,/earlier weeks show 0 because nothing was entered for them, not because no follow-up happened/);
+  assert.doesNotMatch(empty.text,/contacts you entered/);
+  // Singular wording, and the period starting partway through the first displayed week.
+  assert.match(weeklyCoverage(weeksFor([1,0,0,0,0,0,0,2]),weeksFor([1,0,0,0,0,0,0,2])[1].start,format).text,/The earlier week shows only the 1 contact you entered/);
+  const partial=weeklyCoverage(weeks,addDays(weeks[0].start,3),format);
+  assert.equal(partial.kind,'partial');assert.match(partial.text,/started before then/);
+  // Counts inside the reporting period are never described as backdated, and a fully covered chart needs no caption.
+  const covered=weeklyCoverage(weeks,weeks[4].start,format);
+  assert.match(covered.text,/The 4 earlier weeks show only the 18 contacts/);
+  assert.equal(weeklyCoverage(weeks,weeks[0].start),null);
+  assert.equal(weeklyCoverage(weeks,addDays(weeks[0].start,-30)),null);
+});
+
+test('backdated owner-entered contacts stay in the weekly counts and the caption describes them honestly',t=>{
+  const f=fixture(t);f.create('A');f.create('B');
+  f.contact('A',addDays(today,-30));f.contact('A',addDays(today,-22));f.contact('B',addDays(today,-22));f.contact('B',today);
+  const wide=f.store.results(f.owner.business_id,addDays(today,-55),today);
+  const weeks=contactsPerWeek(wide.contacts,today);
+  assert.equal(weeks.reduce((n,w)=>n+w.count,0),4,'all four reported contacts are charted, including the backdated ones');
+  assert.deepEqual(weeks.map(w=>w.count),[0,0,0,1,2,0,0,1]);
+  assert.ok(wide.startedAt.slice(0,10)>=addDays(today,-1),'the ledger only began recording today');
+  const note=weeklyCoverage(weeks,wide.startedAt);
+  assert.equal(note.kind,'backdated');
+  assert.match(note.text,/show only the 3 contacts you entered with earlier dates/);
+  assert.equal(f.report().counts.contacts,4,'the reporting totals still include every reported contact');
+  // A business with no historical entries gets the uncovered wording instead of a claim about activity.
+  const g=fixture(t);g.create('C');g.contact('C');
+  const quiet=weeklyCoverage(contactsPerWeek(g.store.results(g.owner.business_id,addDays(today,-55),today).contacts,today),g.store.results(g.owner.business_id,today,today).startedAt);
+  assert.equal(quiet.kind,'uncovered');
 });

@@ -5,7 +5,7 @@
 import { request, sendCommand, loadAccount, announceSessionChange } from '/app/api.js';
 import * as D from '/domain.js';
 import { inspectSpreadsheet, statusesFor, previewSpreadsheet } from '/import-mapping.js';
-import { contactEvidence } from '/results.js';
+import { contactEvidence, contactsPerWeek } from '/results.js';
 import { esc, icon, wordmark, initials, money, plural, weekdayDate, shortDate, applySizes, detailHeader, factsAndJob, blockedNotice, draftPanel,
   contactForm, scheduleSection, outcomeSection, timeline } from '/app/ui.js';
 import * as V from '/app/views.js';
@@ -444,12 +444,6 @@ function ensureRange() {
   if (ui.range === 'custom') { if (!ui.from || !ui.to) Object.assign(ui, { from: D.addDays(D.todayISO(), -29), to: D.todayISO() }); return; }
   const today = D.todayISO(); ui.from = D.addDays(today, -(ui.range - 1)); ui.to = today;
 }
-function weekly(contacts, today) {
-  return Array.from({ length: 8 }, (_, i) => {
-    const end = D.addDays(today, -7 * (7 - i)), start = D.addDays(end, -6);
-    return { start, end, count: contacts.filter(c => c.date >= start && c.date <= end).length };
-  });
-}
 async function loadResults() {
   const today = D.todayISO(), key = `${ui.from}|${ui.to}|${ws.revision}|${today}`;
   if (results.key === key) return;
@@ -458,7 +452,7 @@ async function loadResults() {
   try {
     const [r, w] = await Promise.all([request(base + `from=${ui.from}&to=${ui.to}`), request(base + `from=${D.addDays(today, -55)}&to=${today}`)]);
     if (n !== results.request) return;
-    results.data = r; results.weekly = weekly(w.contacts, today);
+    results.data = r; results.weekly = contactsPerWeek(w.contacts, today);
   } catch (error) {
     if (n !== results.request) return;
     results.error = error.kind === 'session' ? 'Your session has ended. Sign in again to see results.' : error.message;

@@ -2,6 +2,7 @@
 // workspace (ctx.ws), the current date and UI state; main.js owns state, commands and events.
 // All figures are computed from server-provided records with the shared domain rules in domain.js.
 import * as D from '/domain.js';
+import { weeklyCoverage } from '/results.js';
 import { FIELD_LABELS, REQUIRED_FIELDS, statusesFor } from '/import-mapping.js';
 import { esc, money, icon, kpi, attentionRow, stateBar, ageChart, activityItem, estimateTable, queueRow, resultCards, cohortBar, weeklyChart,
   supportingRows, importRowsList, longDate, shortDate, plural, panel, empty } from '/app/ui.js';
@@ -148,18 +149,19 @@ export function resultsView(ctx) {
     <div class="qt-notice qt-notice--gold">${icon('info')}<p><strong>Recorded sequence, not proof of caused revenue.</strong> Contacts and outcomes are owner-reported. QuoteTend sends nothing and verifies no delivery or payment. Values are estimate amounts, not collected revenue.</p></div>
     <div data-results-body aria-live="polite">${r.error ? `<div class="qt-notice qt-notice--gold">${icon('alert')}<p>${esc(r.error)} <button class="qt-link" type="button" data-action="reload-results">Try again</button></p></div>` : r.data ? resultsBody(ctx) : '<div class="loading-line"><span class="spinner" aria-hidden="true"></span>Loading recorded results…</div>'}</div>`;
 }
+const weeklyNote = (weeks, started) => { const note = weeklyCoverage(weeks, started, shortDate); return note ? `<p class="qt-help" data-weekly-coverage="${note.kind}">${esc(note.text)}</p>` : ''; };
 function resultsBody(ctx) {
   const r = ctx.results.data, ui = ctx.ui, { quotes } = ctx.ws, m = D.metrics(quotes, ctx.today), st = D.statusTotals(quotes), bs = D.pipelineByState(quotes, ctx.today);
   const started = r.startedAt.slice(0, 10);
   return `${resultCards(r, ui.group)}
     <div class="results-grid">
       ${panel('Cohort outcomes', `${plural(r.counts.followed, 'estimate')} first followed up in this range, classified as of today`, cohortBar(r), { label: 'Cohort outcomes' })}
-      ${panel('Contacts logged per week', 'Last 8 weeks, including repeat contacts', ctx.results.weekly ? weeklyChart(ctx.results.weekly) + (started > ctx.results.weekly[0].start ? `<p class="qt-help">This reporting period began ${esc(shortDate(started))}; earlier weeks show no recorded evidence rather than zero activity.</p>` : '') : '<div class="loading-line"><span class="spinner" aria-hidden="true"></span>Loading…</div>', { label: 'Contacts per week' })}
+      ${panel('Contacts logged per week', 'Last 8 weeks, including repeat contacts', ctx.results.weekly ? weeklyChart(ctx.results.weekly) + weeklyNote(ctx.results.weekly, started) : '<div class="loading-line"><span class="spinner" aria-hidden="true"></span>Loading…</div>', { label: 'Contacts per week' })}
     </div>
     <section class="qt-panel" aria-label="Supporting estimates"><div class="qt-panel__body qt-panel__body--top" data-supporting>${supportingRows(r, ui.group)}</div></section>
     ${panel('Current pipeline snapshot', `As of ${esc(shortDate(ctx.today))}. Not filtered by the date range above.`, `<div class="outcome-split"><div><span>Remaining open pipeline</span><strong>${money(m.openValue)}</strong><small>${plural(m.openCount, 'sent estimate')} awaiting a decision</small></div><div><span>Overdue estimate value</span><strong>${money(bs.overdue.value)}</strong><small>${plural(bs.overdue.count, 'estimate')} past the follow-up date</small></div><div class="won"><span>All recorded wins</span><strong>${money(st.won.value)}</strong><small>${plural(st.won.count, 'estimate')}, with or without a logged follow-up</small></div><div><span>All recorded losses</span><strong>${money(st.lost.value)}</strong><small>${plural(st.lost.count, 'estimate')}</small></div></div>`, { label: 'Current pipeline snapshot' })}
     <details class="calc-notes"><summary>How these numbers are calculated</summary><ul>
-      <li><strong>Contacts logged</strong> counts every reported contact date in the range, including repeat contacts with the same customer. Voided contacts are excluded; corrected contacts use the corrected date.</li>
+      <li><strong>Contacts logged</strong> counts every reported contact date in the range, including repeat contacts with the same customer. A contact you enter with an earlier date counts on that date, even before this reporting period began. Voided contacts are excluded; corrected contacts use the corrected date.</li>
       <li><strong>Estimates followed up</strong> counts each estimate once, on its earliest reported contact in this reporting period. Backdated entries can move it between ranges. Its value is the amount stored when that contact was logged.</li>
       <li>A won or lost outcome <strong>qualifies</strong> only when it was recorded after a logged contact, with a reported decision date on or after that contact. Closed estimates without that sequence show as uncertain.</li>
       <li>Outcomes show the latest recorded status as of today, including decisions after the selected end date. Reopened estimates count as open. Won share keeps open and uncertain estimates in the denominator; it is not a causal conversion rate.</li>

@@ -15,8 +15,16 @@ const dir = await mkdtemp(join(tmpdir(), 'quotetend-browser-test-'));
 const dbPath = join(dir, 'accounts.sqlite');
 const shots = 'test-results/private-app';
 await mkdir(shots, { recursive: true });
+const removeDir = () => dirname(dir) === tmpdir() && basename(dir).startsWith('quotetend-browser-test-') ? rm(dir, { recursive: true, force: true }) : undefined;
+// server.close() only drops sockets that have finished a request. Chromium also opens speculative pre-connections that
+// never send one, and Node leaves those open, so close() would wait on them indefinitely (an intermittent hang at the
+// restart step). Once the browser is idle or closed nothing legitimate is in flight, so end every remaining socket and
+// still await the real shutdown, which stops the backup schedule and closes SQLite.
+const stopServer = async server => { const closing = server.close(); server.server.closeAllConnections(); await closing; };
 let running = await startServer({ port: 0, dbPath, logger: () => {} });
-const browser = await chromium.launch({ ...(process.env.QUOTETEND_BROWSER_PATH ? { executablePath: process.env.QUOTETEND_BROWSER_PATH } : { channel: process.env.QUOTETEND_BROWSER || 'msedge' }), headless: true });
+let browser;
+try { browser = await chromium.launch({ ...(process.env.QUOTETEND_BROWSER_PATH ? { executablePath: process.env.QUOTETEND_BROWSER_PATH } : { channel: process.env.QUOTETEND_BROWSER || 'msedge' }), headless: true }); }
+catch (error) { await stopServer(running); await removeDir(); throw error; }
 let base = `http://127.0.0.1:${running.port}`;
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
@@ -277,6 +285,11 @@ try {
   assert.equal(results.values.won, 21480);
   assert.equal(await page.locator('[data-group="overdue"] strong').innerText(), usd(results.values.overdue));
   assert.match(await page.locator('.qt-cols').getAttribute('aria-label'), /1$/);
+  // The workspace was created today, so the earlier weeks were never recorded: the caption must say so without claiming zero activity.
+  const coverage = page.locator('[data-weekly-coverage]');
+  assert.equal(await coverage.getAttribute('data-weekly-coverage'), 'uncovered');
+  assert.match(await coverage.innerText(), /earlier weeks show 0 because nothing was entered for them, not because no follow-up happened/);
+  assert.doesNotMatch(await coverage.innerText(), /no recorded evidence|rather than zero activity/);
   await page.locator('[data-group="won"]').click();
   assert.match(await page.locator('[data-supporting]').innerText(), /Dana Whitfield/);
   await shot('results-1440', { fullPage: true });
@@ -478,7 +491,7 @@ try {
   const beforeRestart = await state();
   await page.locator('[data-action="sign-out"]').click(); await page.waitForURL('**/signin');
   assert.equal((await api('/me')).status, 401);
-  await running.close();
+  await stopServer(running);
   running = await startServer({ port: 0, dbPath, logger: () => {} });
   base = `http://127.0.0.1:${running.port}`;
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
@@ -544,6 +557,9 @@ try {
   pass('signed-out requests are rejected and /account returns to sign-in; no uncaught browser errors or CSP violations');
   console.log(`\n${passed.length} private-app browser groups passed. Screenshots in ${shots}/`);
 } finally {
-  await browser.close(); await running.close();
-  if (dirname(dir) === tmpdir() && basename(dir).startsWith('quotetend-browser-test-')) await rm(dir, { recursive: true, force: true });
+  // Every resource is released even if an earlier step fails; a cleanup failure is reported and fails the run, never swallowed.
+  const failures = [];
+  for (const release of [() => browser.close(), () => stopServer(running), removeDir]) { try { await release(); } catch (error) { failures.push(error); } }
+  for (const error of failures) console.error('cleanup failed:', error);
+  if (failures.length) process.exitCode = 1;
 }
