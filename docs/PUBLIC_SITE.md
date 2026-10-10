@@ -1,12 +1,15 @@
 # Public website and interactive demo
 
-`public-site/` is a self-contained static site: the marketing homepage, the interactive contractor demo and a 404 page. It has no build step, no dependencies beyond the browser, and no connection to the private application, its accounts, APIs or SQLite data. Every demo record is fictional and stays in the visitor's browser.
+`public-site/` is a self-contained static site: four marketing pages, the interactive contractor demo and a 404 page. It has no build step, no dependencies beyond the browser, and no connection to the private application, its accounts, APIs or SQLite data. Every demo record is fictional and stays in the visitor's browser.
 
 ## Structure
 
 | Path | Purpose |
 |---|---|
-| `index.html` | Homepage. Product visuals are rendered from the demo's components and records, so the numbers always match the demo. |
+| `index.html` | Homepage: hero, the problem, three core benefits, a product preview and the early-access form (`#early-access`). Product visuals are rendered from the demo's components and records, so the numbers always match the demo. |
+| `how-it-works.html` | The five-step workflow (what you do, what QuoteTend does), the three distinctions (a draft isn't a sent message; you contact customers yourself; a recorded win isn't proof of cause) and the estimate calculator. |
+| `features.html` | Capabilities grouped as pipeline, follow-up, and results & data, plus "Available today / On the roadmap" (`#availability`). Previews marked `data-core` hide the demo's planned-feature extras (trade tags, trade and follow-up filters, the pipeline-by-state chart). |
+| `faq.html` | Eleven questions in three groups, as native `<details>` accordions. |
 | `demo.html` | Interactive demo for the fictional Fernbrook Roofing & Exteriors. |
 | `404.html` | Not-found page for static hosts. |
 | `favicon.ico`, `site.webmanifest`, `assets/favicon.svg`, `assets/icons/` | Favicon and app icons (generated, see Brand). |
@@ -23,7 +26,8 @@ Set-Location -LiteralPath 'C:\Dev\AI Businesses\QuoteTend'
 node public-site/serve.mjs
 ```
 
-- Website: http://127.0.0.1:4180/
+- Website: http://127.0.0.1:4180/ (also `/how-it-works.html`, `/features.html`, `/faq.html`)
+- Early-access form: http://127.0.0.1:4180/#early-access
 - Demo: http://127.0.0.1:4180/demo.html
 - Guided tour: http://127.0.0.1:4180/demo.html?tour=1 (`?tour=3` opens step 3 directly)
 
@@ -45,9 +49,15 @@ node scripts/generate-brand-icons.mjs
 
 ## Deploy
 
-Publish the contents of `public-site/` to any static HTTPS host (for example Cloudflare Pages, Netlify, GitHub Pages or S3 with CloudFront). Links are relative, so the site also works from a sub-path. Configure the host to serve `404.html` for missing pages. Excluding `serve.mjs` from the upload is optional; it contains no secrets.
+Publish the contents of `public-site/` to any static HTTPS host (for example Cloudflare Pages, Netlify, GitHub Pages or S3 with CloudFront). Links are relative, so the site also works from a sub-path. Pages are linked by their `.html` file names, so no rewrite or "clean URL" rule is needed (hosts that add one keep working). Configure the host to serve `404.html` for missing pages. Excluding `serve.mjs` from the upload is optional; it contains no secrets.
 
-Fonts load from Google Fonts. If that is not acceptable, self-host the two families (Bricolage Grotesque and Inter, both open-licensed) and replace the `<link>` in both HTML files; the system font fallbacks already work.
+There is one early-access form, on the homepage. Every other page links to it as `./#early-access`; on arrival `site.js` settles the scroll position below the sticky header and moves focus to the form section. The header, mobile menu and footer markup is repeated in each marketing page (there is no build step); `tests/public-site.test.mjs` fails if the copies drift apart.
+
+Fonts load from Google Fonts. If that is not acceptable, self-host the two families (Bricolage Grotesque and Inter, both open-licensed) and replace the `<link>` in each HTML file; the system font fallbacks already work.
+
+### Shared files used by the private application
+
+The Sprint 2 private application (branch `venture/private-app-v2`) serves `assets/css/tokens.css`, `assets/css/app.css` and `assets/favicon.svg` directly. Treat those three files as a shared design system: website-only styling belongs in `site.css`, and any change to the shared files must be backward-compatible and checked with that branch's `node tests/browser-rehearsal.mjs`.
 
 ## Early-access form (Formspree)
 

@@ -5,7 +5,7 @@ import { resolveContactConfig, mountEarlyAccess } from './early-access.js';
 import { COMPANY, createWorkspace, todayISO, addDays, metrics, queues, pipelineByState, filterEstimates, recordContact, resultsForRange,
   previewImport, sampleImportCSV, statusTotals, TRADES } from './workspace.js';
 import { esc, money, moneyShort, icon, kpi, attentionRow, stateBar, estimateTable, queueRow, draftPanel, contactForm, timeline,
-  resultCards, cohortBar, mappingTable, importRows, previewSidebar, duePill, longDate, weekdayDate, detailHeader, detailBody, plural, badge } from './components.js';
+  resultCards, cohortBar, mappingTable, importRows, previewSidebar, duePill, longDate, shortDate, weekdayDate, detailHeader, detailBody, plural, badge, avatar } from './components.js';
 import { tourCard, tourContext, FOCUS_ID } from './tour.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -70,20 +70,27 @@ const counts = { estimates: quotes.length, due: m.dueCount };
 const windowBar = title => `<div class="window-bar"><span class="dots"><i></i><i></i><i></i></span><span class="window-title">${esc(title)}</span><span class="window-tag">Fictional demo data</span></div>`;
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
 
-const shots = {
-  hero() {
-    const overdue = q.due.filter(x => x.next_follow_up_date < today).length;
-    return `<div class="window qt">${windowBar(`Overview · ${COMPANY.name}`)}<div class="window-body">${previewSidebar('overview', counts)}
+// Previews marked data-core (the Features page) show only what the customer app has today, so they
+// leave out the demo's planned-feature extras: trade tags, the trade and follow-up filters and the
+// pipeline-by-state chart.
+const overviewWindow = core => {
+  const overdue = q.due.filter(x => x.next_follow_up_date < today).length;
+  return `<div class="window qt">${windowBar(`Overview · ${COMPANY.name}`)}<div class="window-body">${previewSidebar('overview', counts)}
       <div class="pv-main"><div class="pv-head"><div><p class="qt-eyebrow">${esc(longDate(today))}</p><h3 class="pv-title">${greet()}. ${plural(m.dueCount, 'follow-up')} need${m.dueCount === 1 ? 's' : ''} attention.</h3></div></div>
         <div class="qt-kpis qt-kpis--3">
           ${kpi({ label: 'Open pipeline', value: money(m.openValue), sub: `${m.openCount} sent estimates awaiting a decision`, ic: 'dollar' })}
           ${kpi({ label: 'Due & overdue', value: String(m.dueCount), sub: `<strong class="qt-tone-overdue">${overdue} overdue</strong> · ${m.dueCount - overdue} due today`, ic: 'alert', accent: 'alert' })}
           ${kpi({ label: 'Recorded wins', value: money(m.wonValue), sub: `${m.wonCount} estimates marked won`, ic: 'checkCircle', accent: 'won' })}
         </div>
-        <div class="pv-grid">
+        <div class="pv-grid${core ? ' pv-grid--single' : ''}">
           <section class="qt-panel"><div class="qt-panel__head"><div><h4 class="qt-panel__title">Needs your attention <span class="qt-count">${q.due.length}</span></h4><p class="qt-panel__desc">Oldest follow-up promises first</p></div></div><ul class="qt-attn-list">${q.due.map(x => attentionRow(x, today, quotes, { interactive: false })).join('')}</ul></section>
-          <section class="qt-panel"><div class="qt-panel__head"><div><h4 class="qt-panel__title">Open pipeline</h4><p class="qt-panel__desc">By follow-up state</p></div></div><div class="qt-panel__body">${stateBar(byState, m.openValue)}</div></section>
-        </div></div></div></div>
+          ${core ? '' : `<section class="qt-panel"><div class="qt-panel__head"><div><h4 class="qt-panel__title">Open pipeline</h4><p class="qt-panel__desc">By follow-up state</p></div></div><div class="qt-panel__body">${stateBar(byState, m.openValue)}</div></section>`}
+        </div></div></div></div>`;
+};
+
+const shots = {
+  hero() {
+    return `${overviewWindow(false)}
       <div class="float float--draft"><div class="float-head"><strong>${icon('pen')}Follow-up draft · ${esc(focus.customer_name)}</strong><span class="qt-chip">Editable</span></div>
         <p>Hi Dana, I wanted to check in on the ${esc(money(focus.amount_usd))} estimate for your roof replacement. Have you had a chance to look it over?</p>
         <div class="float-actions"><span class="qt-btn qt-btn--primary qt-btn--sm">${icon('copy')}Copy draft</span><span class="float-note">Nothing is sent automatically</span></div></div>
@@ -109,11 +116,15 @@ const shots = {
       <ul>${list.slice(0, k === 'overdue' ? 3 : 2).map(x => `<li><span><b>${esc(x.customer_name)}</b> · ${esc(x.trade)}</span><span>${money(x.amount_usd)}</span></li>`).join('')}</ul></section>`).join('')}</div>`;
   },
 
-  estimates() {
-    const list = filterEstimates(quotes, { query: 'roof', sort: 'followup' }, today);
+  overview() { return overviewWindow(true); },
+
+  estimates(core) {
+    // The customer app searches customer, job, estimate ID and email; the demo also searches its planned fields.
+    const list = filterEstimates(quotes, { query: 'roof', sort: 'followup' }, today)
+      .filter(x => !core || `${x.customer_name} ${x.job_description} ${x.estimate_id} ${x.customer_email}`.toLowerCase().includes('roof'));
     const value = list.filter(x => x.status === 'sent').reduce((s, x) => s + x.amount_usd, 0);
     return `<div class="card-ui qt cards-at-narrow"><div class="card-ui__bar"><div><h4>Estimates</h4><p>${quotes.length} estimates · ${money(m.openValue)} open</p></div><span class="qt-btn qt-btn--sm">${icon('import')}Import CSV</span></div>
-      <div class="toolbar-pv"><span class="search-pv">${icon('search')}roof<span class="caret"></span></span><span class="select-pv">All statuses ${icon('chevronDown')}</span><span class="select-pv">Any follow-up ${icon('chevronDown')}</span><span class="select-pv">All trades ${icon('chevronDown')}</span></div>
+      <div class="toolbar-pv"><span class="search-pv">${icon('search')}roof<span class="caret"></span></span><span class="select-pv">All statuses ${icon('chevronDown')}</span>${core ? '' : `<span class="select-pv">Any follow-up ${icon('chevronDown')}</span><span class="select-pv">All trades ${icon('chevronDown')}</span>`}</div>
       <div class="summary-pv"><span>Showing <strong>${list.length}</strong> of ${quotes.length} estimates matching “roof”</span><span><strong>${money(value)}</strong> open in this view</span></div>
       ${estimateTable(list.slice(0, 6), today, quotes, { interactive: false })}</div>`;
   },
@@ -142,6 +153,21 @@ const shots = {
       <div style="padding:1.1em 1.3em 1.3em;display:grid;gap:1.1em">${resultCards(r, { interactive: false, selected: 'won-value' }).replace('qt-results', 'qt-results qt-results--pv')}${cohortBar(r)}</div></div>`;
   },
 
+  // Customer and project details: only fields the customer app stores today.
+  record() {
+    const x = focus, last = x.history.at(-1);
+    return `<div class="record-pv qt"><div class="record-pv__head"><div class="record-pv__who">${avatar(x.customer_name)}<div><strong>${esc(x.customer_name)}</strong><small>${esc(x.estimate_id)} · Fictional estimate</small></div></div>${badge(x)}</div>
+      <dl class="record-pv__facts">
+        <div><dt>Email</dt><dd>${esc(x.customer_email)}</dd></div>
+        <div><dt>Estimate amount</dt><dd>${money(x.amount_usd)}</dd></div>
+        <div class="full"><dt>Job</dt><dd>${esc(x.job_description)}</dd></div>
+        <div><dt>Estimate date</dt><dd>${esc(shortDate(x.estimate_date))}</dd></div>
+        <div><dt>Next follow-up</dt><dd>${duePill(x, today, quotes)}</dd></div>
+        <div class="full"><dt>Notes</dt><dd>${esc(x.notes)}</dd></div>
+        <div class="full"><dt>Activity history</dt><dd>${plural(x.history.length, 'entry', 'entries')}${last ? `<small>Latest: ${esc(last.text)}</small>` : ''}</dd></div>
+      </dl></div>`;
+  },
+
   import() {
     const p = previewImport(sampleImportCSV(today), quotes);
     return `<div class="card-ui qt"><div class="card-ui__bar"><div><h4>Import preview</h4><p>Nothing is saved until you choose Import</p></div><span class="qt-chip">${icon('file')} estimates-export.csv</span></div>
@@ -165,12 +191,29 @@ const minis = {
     .map(([k, l]) => `<div class="mini-row"><span class="qt-due qt-due--${k}">${icon(k === 'overdue' ? 'alert' : k === 'today' ? 'flag' : 'calendar')}${l} · ${byState[k].count}</span><b>${moneyShort(byState[k].value)}</b></div>`).join(''),
   follow: () => `<div class="mini-draft">Hi Dana, I wanted to check in on the estimate for your roof replacement…</div><span class="qt-btn qt-btn--primary">${icon('copy')}Copy draft</span>`,
   track: () => `<div class="mini-row"><span class="qt-meta">${icon('Phone')}Phone contact recorded</span><span>Today</span></div>
-    <div class="mini-row"><span>Next follow-up</span><b>${esc(weekdayDate(addDays(today, 3)))}</b></div><div class="mini-row"><span class="qt-badge qt-badge--won"><i></i>Won</span><b>${money(statusTotals(quotes).won.value)}</b></div>`
+    <div class="mini-row"><span>Next follow-up</span><b>${esc(weekdayDate(addDays(today, 3)))}</b></div>
+    <div class="mini-row"><span>Activity history</span><b>${plural(focus.history.length + 1, 'entry', 'entries')}</b></div><div class="mini-row"><span class="qt-badge qt-badge--won"><i></i>Won</span><b>${money(statusTotals(quotes).won.value)}</b></div>`,
+  organize: () => {
+    const pick = [...quotes.filter(x => x.status === 'sent').sort((a, b) => b.amount_usd - a.amount_usd).slice(0, 2), quotes.find(x => x.status === 'won')].filter(Boolean);
+    return `<div class="mini-row mini-head"><span>${plural(m.openCount, 'sent estimate')} open</span><b>${money(m.openValue)}</b></div>
+      ${pick.map(x => `<div class="mini-row"><span>${esc(x.customer_name)}</span><span class="mini-end"><b>${moneyShort(x.amount_usd)}</b>${badge(x)}</span></div>`).join('')}`;
+  },
+  log: () => `<div class="mini-row mini-head"><span class="qt-meta">${icon('Phone')}Log a contact</span><span>${esc(focus.customer_name.split(' ')[0])}</span></div>
+    <div class="mini-row"><span>Contact date</span><b>Today</b></div><div class="mini-row"><span>Method</span><b>Phone</b></div>
+    <div class="mini-row"><span>Next follow-up</span><b>${esc(weekdayDate(addDays(today, 3)))}</b></div>`,
+  results: () => {
+    const r = resultsForRange(state, 30, today);
+    return `<div class="mini-row mini-head"><span class="qt-meta">${icon('results')}Follow-up Results</span><span>30 days</span></div>
+      <div class="mini-row"><span>Contacts logged</span><b>${r.counts.contacts}</b></div><div class="mini-row"><span>Estimates followed up</span><b>${r.counts.followed}</b></div>
+      <div class="mini-row"><span>Won after a follow-up</span><b>${r.counts.won}</b></div>`;
+  }
 };
 
 for (const el of $$('[data-shot]')) {
   try {
-    el.innerHTML = shots[el.dataset.shot]();
+    const core = el.hasAttribute('data-core');
+    el.innerHTML = shots[el.dataset.shot](core);
+    if (core) el.querySelectorAll('.qt-trade').forEach(n => n.remove());
     // Previews are decorative copies of product UI: keep them out of the tab order and ID space.
     el.setAttribute('inert', '');
     el.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
@@ -193,8 +236,16 @@ function updateCalc() {
 calcInputs.forEach(i => i.addEventListener('input', updateCalc)); if (calcInputs.length) updateCalc();
 
 // ---------- Early access ----------
+// The homepage holds the only form; every other page links to it at #early-access.
 const contact = resolveContactConfig(SITE_CONFIG, location);
 const earlyCard = $('[data-early]');
 if (earlyCard) mountEarlyAccess(earlyCard, contact);
-if (contact.mode === 'preview') console.warn('QuoteTend: early-access form is not connected (set formEndpoint in assets/js/site-config.js).');
+if (earlyCard && contact.mode === 'preview') console.warn('QuoteTend: early-access form is not connected (set formEndpoint in assets/js/site-config.js).');
 if (contact.email) $('[data-footer-contact]')?.insertAdjacentHTML('beforeend', `<li><a href="mailto:${esc(contact.email)}">Contact</a></li>`);
+
+// Arriving from another page at a section (for example ./#early-access from a Features call to
+// action): once the previews above it have rendered, settle the position and move focus there,
+// the same as an in-page link does.
+let arrival = null;
+try { arrival = location.hash.length > 1 ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null; } catch { arrival = null; }
+if (arrival) requestAnimationFrame(() => { arrival.setAttribute('tabindex', '-1'); arrival.scrollIntoView({ block: 'start', behavior: 'instant' }); arrival.focus({ preventScroll: true }); });
