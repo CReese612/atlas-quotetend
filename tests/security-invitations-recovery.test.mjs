@@ -19,7 +19,7 @@ test('production registration needs a matching, unexpired, unused invitation, an
   const env = await H.launch(t, { production: true }), c = H.client(env);
   invite(env, 'invited@example.com', 'fictional-invite-one');
   const before = [owners(env.store.db), businesses(env.store.db), invitations(env.store.db)];
-  const refused = [body('invited@example.com'), body('invited@example.com', ''), body('invited@example.com', 'wrong-code'), body('invited@example.com', 123), body('invited@example.com', { code: 'fictional-invite-one' }), body('invited@example.com', null),
+  const refused = [body('invited@example.com'), body('invited@example.com', ''), body('invited@example.com', 'wrong-code'), body('invited@example.com', 123), body('invited@example.com', { code: 'fictional-invite-one' }), body('invited@example.com', ['fictional-invite-one']), body('invited@example.com', null),
     body('other@example.com', 'fictional-invite-one'), body('invited@example.com', 'FICTIONAL-INVITE-ONE'), body('invited@example.com', ' fictional-invite-one')];
   for (const payload of refused) { const r = await c.post('/api/register', payload); assert.equal(r.status, 403, JSON.stringify(payload.invitation)); assert.deepEqual(r.data, INVITE_DENIED); assert.deepEqual(r.setCookie, []); }
   assert.deepEqual([owners(env.store.db), businesses(env.store.db), invitations(env.store.db)], before, 'no owner, business or invitation change from refusals');
@@ -113,7 +113,8 @@ test('a recovery code works only for its own owner; every failure is the same an
   const sa = await H.signIn(env, 'owner-a@example.com'), sb = await H.signIn(env, 'owner-b@example.com');
   const codeA = (await issue(sa)).data.code, codeB = (await issue(sb)).data.code;
   const hashes = [env.store.ownerById(a.id).password_hash, env.store.ownerById(b.id).password_hash];
-  const attempts = [['owner-b@example.com', codeA], ['owner-a@example.com', codeB], ['nobody@example.com', codeA], ['owner-a@example.com', 'wrong'], ['owner-a@example.com', ''], ['owner-a@example.com', null], ['owner-a@example.com', { code: codeA }], ['owner-a@example.com', codeA.toUpperCase()], ['owner-a@example.com', codeA + ' '], [undefined, codeA], [['owner-a@example.com'], codeA], ['', codeA]];
+  const attempts = [['owner-b@example.com', codeA], ['owner-a@example.com', codeB], ['nobody@example.com', codeA], ['owner-a@example.com', 'wrong'], ['owner-a@example.com', ''], ['owner-a@example.com', null], ['owner-a@example.com', [codeA]],
+    ['owner-a@example.com', { code: codeA }], ['owner-a@example.com', codeA.toUpperCase()], ['owner-a@example.com', codeA + ' '], [undefined, codeA], [['owner-a@example.com'], codeA], ['', codeA]];
   const answers = new Set();
   for (const [email, code] of attempts) { const r = await recover(env, email, code); assert.equal(r.status, 400, JSON.stringify([email, code])); answers.add(JSON.stringify(r.data)); assert.deepEqual(r.setCookie, []); }
   assert.equal(answers.size, 1, 'unknown owner, wrong owner and wrong code are indistinguishable: ' + [...answers]);
