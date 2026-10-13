@@ -1,0 +1,13 @@
+estimate_id,customer_name,customer_email,job_description,amount_usd,estimate_date,status,next_follow_up_date,last_contact_date,do_not_contact,notes
+EST-V001,Fictional Customer Ten,customer.ten@example.com,Roof inspection - follow-up due on the frozen date,1850.00,2026-09-01,sent,2026-09-16,2026-09-01,false,Synthetic fixture: next_follow_up_date equals the frozen test date 2026-09-16
+EST-V002,Fictional Customer Eleven,customer.eleven@example.com,Chimney flashing - future follow-up,920.50,2026-09-10,sent,2026-09-30,2026-09-10,false,Synthetic fixture: future follow-up; not due on the frozen date
+EST-V003,Fictional Customer Twelve,customer.twelve@example.com,Whole-roof replacement - overdue sent,12400.00,2026-07-01,sent,2026-08-01,2026-07-15,false,Synthetic fixture: overdue sent estimate; belongs in the attention queue
+EST-V004,Fictional Customer Thirteen,customer.thirteen@example.com,Draft estimate with an overdue follow-up date,640.00,2026-06-20,draft,2026-07-01,,false,Synthetic fixture: drafts are not follow-up eligible
+EST-V005,Fictional Customer Fourteen,customer.fourteen@example.com,Won estimate that still has an overdue follow-up date,4100.00,2026-05-01,won,2026-05-20,2026-05-18,false,Synthetic fixture: won estimates stay out of the follow-up queue
+EST-V006,Fictional Customer Fifteen,customer.fifteen@example.com,Lost estimate that still has an overdue follow-up date,2750.00,2026-04-10,lost,2026-04-25,2026-04-20,false,Synthetic fixture: lost estimates stay out of the follow-up queue
+EST-V007,Fictional Customer Sixteen,,Garage re-roof - no e-mail address,550.00,2026-09-05,sent,2026-09-16,2026-09-05,false,Synthetic fixture: empty customer_email is allowed
+EST-V008,Fictional Customer Seventeen,customer.seventeen@example.com,Commercial roof coating,18999.99,2026-08-28,sent,2026-09-20,2026-08-28,false,"Synthetic fixture: notes with commas, and ""quoted figures"" for after-hours work"
+EST-V009,Fictional Customer Eighteen,customer.eighteen@example.com,Skylight reseal - notes contain line breaks,3600.00,2026-09-02,sent,2026-09-18,2026-09-02,false,"Line one: prefers evenings
+Line two: gate is on the left
+Line three: end"
+EST-V010,Fictional Customer Nineteen,customer.nineteen@example.com,Formula-looking notes when exported,1125.00,2026-09-08,sent,2026-09-22,2026-09-08,false,"=SUM(A1:A10)|+cmd|'=HYPERLINK(""http://example.com"")"

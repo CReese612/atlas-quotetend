@@ -1,0 +1,6 @@
+estimate_id,customer_name,customer_email,job_description,amount_usd,estimate_date,status,next_follow_up_date,last_contact_date,do_not_contact,notes
+EST-S001,Fictional Customer One,customer.one@example.com,Fictional ridge repair (already won),3200.00,2026-07-10,won,2026-07-20,2026-07-15,false,Synthetic fixture: won estimate that an import must not reopen
+EST-S002,Fictional Customer Two,customer.two@example.com,Fictional gutter replacement (already lost),1450.00,2026-06-01,lost,2026-06-15,2026-06-10,false,Synthetic fixture: lost estimate that an import must not reopen
+EST-S003,Fictional Customer Three,customer.three@example.com,Fictional flashing repair (opted out),980.00,2026-08-01,sent,2026-08-15,2026-08-01,true,Synthetic fixture: opted out; an import must never silently clear this
+EST-S004,Fictional Customer Four,customer.four@example.com,Fictional siding patch (exact re-import match),2100.00,2026-08-05,sent,2026-09-16,2026-08-05,false,Synthetic fixture: exact field match target for skip-on-reimport
+EST-S005,Fictional Customer Five,customer.five@example.com,Fictional soffit repair (shared email seed),750.00,2026-08-20,sent,2026-09-10,2026-08-20,false,Synthetic fixture: open estimate whose email is shared with a later opted-out row

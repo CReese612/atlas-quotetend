@@ -1,0 +1,8 @@
+estimate_id,customer_name,customer_email,job_description,amount_usd,estimate_date,status,next_follow_up_date,last_contact_date,do_not_contact,notes
+EST-I001,Fictional Invalid One,invalid.one@example.com,Invalid status value,100.00,2026-09-01,pending,2026-09-16,2026-09-01,false,Synthetic fixture: status is not one of the four allowed values
+EST-I002,Fictional Invalid Two,invalid.two@example.com,Invalid estimate date,100.00,09/16/2026,sent,2026-09-20,2026-09-01,false,Synthetic fixture: estimate_date is not ISO
+EST-I003,Fictional Invalid Three,invalid.three@example.com,Invalid follow-up date,100.00,2026-09-01,sent,not-a-date,2026-09-01,false,Synthetic fixture: next_follow_up_date is unparseable
+EST-I004,Fictional Invalid Four,invalid.four@example.com,Invalid do-not-contact flag,100.00,2026-09-01,sent,2026-09-16,2026-09-01,yes,Synthetic fixture: do_not_contact must be true or false
+EST-I005,Fictional Invalid Five,invalid.five@example.com,Invalid amount,twelve hundred,2026-09-01,sent,2026-09-16,2026-09-01,false,Synthetic fixture: amount_usd is not numeric
+,Fictional Invalid Six,invalid.six@example.com,Empty estimate ID,100.00,2026-09-01,sent,2026-09-16,2026-09-01,false,Synthetic fixture: estimate_id is empty
+EST-I007,Fictional Invalid Seven,invalid.seven@example.com,Negative amount,-50.00,2026-09-01,sent,2026-09-16,2026-09-01,false,Synthetic fixture: amount_usd is negative
