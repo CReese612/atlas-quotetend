@@ -95,7 +95,7 @@ test('errors and logs never carry stack traces, SQL, file paths, credentials or 
   const { env, A, session } = await setup(t);
   const probes = [['POST', '/api/login', undefined, '{"email":'], ['POST', '/api/register', undefined, '[1,2'], ['POST', `/api/workspaces/${A}/commands`, undefined, 'not json'], ['POST', `/api/workspaces/${A}/commands`, undefined, '"string"'], ['POST', `/api/workspaces/${A}/commands`, undefined, 'null'], ['POST', `/api/workspaces/${A}/commands`, undefined, '[]'],
     ['GET', `/api/workspaces/${A}/results?from=x&to=y`], ['GET', `/api/workspaces/${A}/results?from=2026-01-01`], ['GET', `/api/workspaces/${A}/results?from[]=1&to[]=2`], ['GET', `/api/workspaces/${A}/results?from=2099-01-01&to=2099-01-02`], ['GET', `/api/workspaces/${A}/results?from=2026-02-30&to=2026-03-01`],
-    ['GET', `/api/workspaces/${A}/snapshots/'%20OR%201=1--`], ['GET', '/%E0%A4%A']];
+    ['GET', `/api/workspaces/${A}/snapshots/'%20OR%201=1--`], ['GET', '/api/workspaces/%E0%A4%A'], ['GET', '/%E0%A4%A']];
   for (const [method, path, , raw] of probes) {
     const r = await session.send(path, method, undefined, {}, raw === undefined ? {} : { raw });
     assert.ok(r.status >= 400 && r.status < 500, `${method} ${path} -> ${r.status}`); assert.doesNotMatch(r.text, STACK, `${method} ${path}: ${r.text}`); H.assertNoLeak(assert, r, 'A', path);
