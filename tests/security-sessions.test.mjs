@@ -175,3 +175,28 @@ test('concurrent sign-ins create independent sessions; revoking one does not aff
   const statuses = await Promise.all(clients.map(c => c.get('/api/me').then(r => r.status)));
   assert.deepEqual(statuses, [401, 200, 200, 200, 200, 200]);
 });
+
+test('a stored session start is validated before any arithmetic: hostile types give a generic 401, never a 500', async t => {
+  const { env } = await setup(t);
+  const session = await H.signIn(env, 'owner-a@example.com'), sid = H.sidOf(session.cookie), db = env.store.db;
+  const original = db.prepare('SELECT data FROM sessions WHERE sid=?').get(sid).data, NOW = Date.now();
+  // Raw JSON text, so values JSON.stringify could not produce (1e999 parses to Infinity) are covered too.
+  const withStarted = literal => original.replace(/"started":[^,}]+/, `"started":${literal}`);
+  assert.notEqual(withStarted('0'), original, 'the fixture session has a started field to replace');
+  const hostile = { null: 'null', 'empty array': '[]', 'array of a number': `[${NOW}]`, 'empty object': '{}', 'coercion-hostile object': '{"toString":null,"valueOf":null}', 'object with valueOf text': `{"valueOf":"${NOW}"}`,
+    string: '"yesterday"', 'numeric string': `"${NOW}"`, boolean: 'true', Infinity: '1e999', '-Infinity': '-1e999', 'future by one millisecond': String(NOW + 60_000), 'far future': '9007199254740991', negative: '-1' };
+  const before = H.fingerprint(env, env.store.ownerByEmail('owner-a@example.com').business_id);
+  for (const [label, literal] of Object.entries(hostile)) {
+    db.prepare('UPDATE sessions SET data=? WHERE sid=?').run(withStarted(literal), sid);
+    for (const path of ['/api/me', '/api/workspaces/' + env.store.ownerByEmail('owner-a@example.com').business_id]) {
+      const r = await session.get(path);
+      assert.equal(r.status, 401, `${label} -> ${r.status} ${r.text.slice(0, 80)}`);
+      assert.deepEqual(r.data, { error: 'Please sign in again. Unsaved changes have not been applied.' }, label);
+    }
+  }
+  assert.ok(!env.logs.some(e => e.event === 'request_failed'), 'no request was logged as a server fault');
+  // A genuine start time still works.
+  db.prepare('UPDATE sessions SET data=? WHERE sid=?').run(withStarted(String(NOW - 1000)), sid);
+  assert.equal((await session.get('/api/me')).status, 200);
+  assert.equal(H.fingerprint(env, env.store.ownerByEmail('owner-a@example.com').business_id), before, 'refused requests changed nothing');
+});

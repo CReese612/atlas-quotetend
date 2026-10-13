@@ -74,9 +74,10 @@ export async function accountAPI(store, port, config={}) {
   });
   api.use((req, res, next) => {
     const owner = typeof req.session.ownerId==='string' && store.ownerById(req.session.ownerId);
-    // The start time must be a real moment no later than now: a non-numeric or future value would otherwise skip the eight-hour limit.
-    const started=req.session.started,age=Date.now()-started;
-    if (!owner || store.suspended(owner.id) || req.session.credentialVersion!==tokenHash(owner.password_hash) || typeof started!=='number' || !(age>=0 && age<HOURS_8)) {
+    // The start time must be a finite number no later than now and under eight hours old. It is type-checked before any
+    // arithmetic: subtracting a hostile stored object would throw (a 500), and NaN or a future value would skip the limit.
+    const started=req.session.started,valid=Number.isFinite(started),age=valid?Date.now()-started:NaN;
+    if (!owner || store.suspended(owner.id) || req.session.credentialVersion!==tokenHash(owner.password_hash) || !valid || !(age>=0 && age<HOURS_8)) {
       return res.status(401).json({ error: 'Please sign in again. Unsaved changes have not been applied.' });
     }
     req.owner = owner; next();
