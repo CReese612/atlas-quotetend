@@ -10,6 +10,12 @@ defects (one cross-tenant metadata leak, five input-validation or hardening gaps
 Each was reproduced by a failing test, fixed minimally, and re-verified. No P0 is known. Remaining P1 items are
 operational (audit log, per-account throttling, off-host backups, hosted verification), listed in section 8.
 
+> **Update — Sprint 3A.1 (independent QA remediation).** Codex QA confirmed D1–D7 corrected and found two more code
+> issues, both now fixed on this branch: a residual 500 from a coercion-hostile stored `session.started` (D8) and
+> incorrect Pacific business-date behaviour (the timezone issue first documented in section 6). Section 11 has the
+> details, tests and results. **This branch is a review candidate, not production-ready**; the remaining gates are in
+> sections 8, 9 and 11.
+
 ## 1. Architecture and threat model
 
 ### How a request is authenticated (as built)
@@ -104,9 +110,11 @@ Severity is for the product as hosted for first customers. None allowed cross-te
 | D7 | `backup-accounts.mjs restore-copy` carried the backup's live sessions into the restored database (valid up to 8 h), reviving a hijacked session after an incident. | P2 | `e1e6816` — sessions deleted in the new copy |
 
 Each fix commit contains its regression test. The commit history has the test-only commit first where the test passed
-without a code change.
+without a code change. Sprint 3A.1 adds **D8** (residual session-start 500) — see section 11.
 
 ## 5. Tests executed and exact results
+
+*This section records the original Sprint 3A run at `57989c8`. Sprint 3A.1 results, which supersede it, are in section 11.*
 
 Environment: Node v24.19.0, Windows 11, local machine, fictional data. Commands from the repository root.
 
@@ -134,13 +142,12 @@ related to security and passes whenever the local calendar date equals the UTC d
   was copied from the research folder. No assertion was edited, removed or skipped.
 * **Left alone, documented.** `tests/review-grok-fixtures.mjs` is a manual script (not run by `npm test`) that still reads
   the external folder, including `estimates-test_GrokBot` (first-pass research file). It needs no change for CI.
-* **Open, proposed as a separate commit (not security).** `results.js` (`weeklyCoverage`, line 69) and `app/views.js`
-  (line 155) take `startedAt.slice(0, 10)`, the **UTC** calendar date of an ISO timestamp, and compare it with
-  `todayISO()` / week boundaries, which are **local** dates. After about 19:00 US Central the page says "This reporting
-  period began *tomorrow*" and counts today's contact as backdated. Production sets `TZ=America/Chicago`, so a Chicago
-  contractor sees this every evening. Proposed patch: add `localDateOf(iso)` to `domain.js` (bare `YYYY-MM-DD` input
-  returned unchanged, otherwise the local-calendar date using the same getters as `todayISO`) and use it in those two
-  places; verify the existing results and browser tests with `TZ=UTC`, `America/Chicago` and `Pacific/Kiritimati`.
+* **Was open; fixed in Sprint 3A.1 (`78e5e13`, see section 11).** `results.js` (`weeklyCoverage`, line 69) and
+  `app/views.js` (line 155) took `startedAt.slice(0, 10)`, the **UTC** calendar date of an ISO timestamp, and compared
+  it with `todayISO()` / week boundaries, which were **local** dates. After about 19:00 US Central the page said "This
+  reporting period began *tomorrow*" and counted today's contact as backdated. The original proposal here (a
+  server-local `localDateOf`) was superseded by an explicit Pacific business calendar, because Codex also showed the
+  server's own `TZ` (Chicago) disagrees with the Oregon customers' day.
 
 ## 7. Implications for the future founder Command Center
 
@@ -193,7 +200,10 @@ Not built and no privileged route was added. Findings that constrain the design:
 * `manage-accounts.mjs reset-password` prints the new password to stdout.
 * Passwords are length-checked only (no breached-password check).
 * Operator CLIs assume the server is stopped; concurrent use is documented but not enforced.
-* Results "began" date is off by one in US evenings (section 6; correctness, not security).
+* ~~Results "began" date is off by one in US evenings~~ — fixed in Sprint 3A.1 (section 11).
+* Bounded graceful shutdown (raised by Codex QA; not part of 3A.1): `server.close()` waits for idle keep-alive
+  connections, so a deploy or restart can stall until the platform kills the process (`tests/browser-rehearsal.mjs`
+  already has to force-close sockets to stop its test server). Needs a drain timeout and a matching platform setting.
 
 ## 9. Hosted-testing limitations
 
@@ -215,19 +225,113 @@ disposable data before a customer relies on it:
 1. Authentication and administration audit log (append-only table, same transaction), then per-account throttling.
 2. Off-host encrypted backups plus a documented, timed restore drill (including the session purge).
 3. Hosted staging verification of section 9 using synthetic accounts; add a read-only smoke script for it.
-4. Separate small commit for the Results timezone fix in section 6, with tests under three timezones.
+4. ~~Results timezone fix~~ — done in Sprint 3A.1. Follow-up for the platform owner: remove or align the inert
+   `TZ=America/Chicago` entry in the hosting configuration (`render.yaml` / `.env.production.example`, untouched here).
 5. Session management UX: idle timeout, list and revoke sessions, sign out everywhere.
 6. Command Center design review against section 7 before any admin code is written.
 7. Add `npm run test:security:browser` and `npm test` under `TZ=UTC` to whatever CI is chosen.
+
+## 11. Sprint 3A.1 — Independent QA remediation (pre-merge)
+
+Draft PR #2 stays unmerged. Starting point `57989c8d72238da2c252ecd13053d797293c98e6`; base unchanged at `dbf9242`.
+
+### Independent Codex QA findings
+
+* **Confirmed:** all seven original defects D1–D7 are corrected.
+* **P1 — Pacific business date.** `startedAt.slice(0, 10)` (in `results.js` and `app/views.js`) used the UTC date of a UTC
+  timestamp, and `todayISO()` used the process's zone. Render runs `America/Chicago`, our first customers are in Oregon,
+  so server due/overdue decisions, default effective dates, the "no later than today" limits and report `asOf`
+  disagreed with the Oregon day.
+* **P2 — residual session 500 (D8).** The session guard computed `Date.now() - started` before checking the type, so a
+  stored `{"toString":null,"valueOf":null}` threw (HTTP 500) instead of returning the generic 401.
+* **Not authorized in 3A.1 (still open):** bounded graceful shutdown, authentication audit log, per-account
+  throttling, encrypted off-service backups, hosted proxy/cookie verification.
+
+### D8 — session start validated before arithmetic (`251839b`)
+
+`Number.isFinite(started)` (no coercion) now gates the subtraction; `ownerId` must be a string before lookup. Rejected with
+the unchanged generic 401: `null`, arrays, ordinary and coercion-hostile objects, strings (including numeric strings),
+booleans, `NaN`/`null`, `±Infinity`, future times and negatives. The exact 8-hour boundary and valid sessions are
+unchanged (existing frozen-clock boundary test still passes). New regression test failed (HTTP 500) before the fix.
+
+### Pacific MVP business-date policy (`78e5e13`)
+
+One calendar for the whole product, `America/Los_Angeles` (`BUSINESS_TIME_ZONE` in `domain.js`), applied identically in the
+browser and on the server and independent of the server's `TZ` and the browser's zone.
+
+| Kind of value | Rule |
+| --- | --- |
+| Owner-entered `YYYY-MM-DD` (estimate, follow-up, contact, outcome, report range) | civil date; stored, compared and shown as written; never shifted, including across daylight-saving changes |
+| Recorded timestamps (events `recorded_at`, measurement start, sessions, backups) | UTC instants, unchanged |
+| Instant → day (`todayISO()`, the reporting period's start, history entries lacking a date) | `businessDateOf(instant)` via `Intl.DateTimeFormat.formatToParts` in the IANA zone; no fixed offsets; instants must carry an offset |
+| Display of a restore time | formatted in the business zone |
+
+Consequences: `todayISO()` drives queues, due/overdue, metrics, default contact/effective dates, the future-date limits,
+`input[type=date]` limits, report ranges and `asOf` the same way everywhere. No schema, API shape or per-business setting
+changed; a later per-business zone only passes its IANA name to `businessDateOf`. `render.yaml` was **not** edited (Blueprint
+settings are out of scope): its `TZ=America/Chicago` is now inert for QuoteTend and should be removed or aligned by the
+platform owner. The greeting ("Good morning") still uses the visitor's own clock; it is cosmetic.
+
+### New regressions
+
+| File | Tests | What it proves |
+| --- | --- | --- |
+| `tests/security-sessions.test.mjs` (added test) | +1 | 14 hostile `started` values → generic 401 on two routes, no `request_failed` log, no state change; genuine session still works |
+| `tests/business-calendar.test.mjs` | 8 (9 when a zone is forced) | 21 frozen instants (Pacific winter and summer evenings, both sides of Pacific midnight in PDT and PST, Chicago-already-tomorrow, UTC midnight, spring-forward and fall-back boundaries incl. the 23- and 25-hour days); `businessDateOf`, `todayISO`, DST-safe civil arithmetic, due/overdue/queues, reporting start and weekly caption, ledger defaults, effective-date and range limits, `asOf`, and the HTTP API |
+| `tests/business-calendar-matrix.test.mjs` | 4 | the file above in separate processes set to `America/Los_Angeles`, `America/Chicago`, `UTC`, `Pacific/Kiritimati` with identical expected values |
+| `tests/business-calendar-browser.mjs` | 3 scenarios | real server process (own zone, frozen clock) + browser (own zone, frozen clock): 22:30 Oregon while Chicago/UTC are tomorrow (server Chicago, browser Kiritimati); one second before Pacific midnight (server Kiritimati, browser UTC); 2027 spring-forward (server UTC, browser Chicago). Signs in via the UI; checks due count, contact-form default and maximum, stored effective date and UTC `recordedAt`, `asOf`, range refusal, and "period began" text |
+
+Failing before the fixes: session test 1 (500); calendar unit file 7 of 8; calendar browser 2 of 3 (the third, a DST
+morning on which all zones agree, is a sanity scenario). The previously failing Pacific Results test now passes in every
+zone with no dependence on the current clock.
+
+Test technique notes: Node on Windows ignores `TZ=<IANA name>` set in the shell (only `UTC` and POSIX names work), so
+`tests/helpers/set-timezone.mjs` assigns `process.env.TZ` at start-up from `QUOTETEND_TEST_TZ`; browser zone comes from
+`QUOTETEND_BROWSER_TZ` (Playwright `timezoneId`). Frozen instants in the browser test are in the real future because Chromium
+expires cookies against the real clock.
+
+### Results (this machine, Node v24.19.0, Edge via Playwright)
+
+| Run | Result |
+| --- | --- |
+| `npm test`, default environment (US Central) | **149 tests, 149 pass, 0 fail**, 14.4 s, exits by itself |
+| Unit suite with `QUOTETEND_TEST_TZ` = `America/Los_Angeles`, `America/Chicago`, `UTC`, `Pacific/Kiritimati` | **150 / 150 pass in each** (149 + the zone self-check) |
+| `npm run test:browser` default, then server = browser zone in each of the four zones | **24 / 24 groups** every time |
+| Mixed zones (server / browser): Chicago/Los Angeles, Los Angeles/Kiritimati, UTC/Chicago, Kiritimati/UTC | **24 / 24** every time |
+| `npm run test:security:browser` default and in each of the four zones | all pass (16 checks) |
+| `npm run test:public:browser` default and in each of the four zones | **27 / 27** every time |
+| `npm run test:calendar:browser` | **3 / 3 scenarios** |
+| Security regressions D1–D7 | `tests/security-*.test.mjs` 39 / 39 pass (38 original + D8 test) |
+
+### Remaining gates (not production-ready)
+
+Section 8's P1 items are unchanged and unauthorized for this assignment: authentication audit log, per-account
+throttling, encrypted off-service backups with a restore drill, bounded graceful shutdown, and hosted verification of
+the proxy hop count, `Secure` cookies and HSTS (section 9). Also pending: the platform owner aligning the inert `TZ` entry,
+and Codex re-audit of this branch.
+
+### Sprint 3A.1 commits
+
+| Commit | Summary |
+| --- | --- |
+| `251839b9ca99cbccea27e371ae2dedbc60c4193b` | fix(session): validate stored start before arithmetic |
+| `78e5e130071847602a148a1a97b3af77a620b116` | fix(dates): align reporting with Pacific business day |
+| `425e4b33b242a0985ba21933aa7095cb7b118f94` | test(dates): add frozen-clock browser calendar test and zone controls |
+| *(this documentation commit)* | docs(security): record Sprint 3A.1 QA remediation — the branch head is the new candidate; its SHA is in the handoff |
 
 ## Reproducing this branch
 
 ```bash
 git fetch origin
 git switch security/tenant-isolation-hardening
-npm test                         # node:test, 136 tests
-TZ=UTC npm test                  # all pass at any time of day
-npm run test:security:browser    # needs Edge/Chromium (set QUOTETEND_BROWSER_PATH for another build)
+npm test                         # node:test, 149 tests; includes the four-zone calendar matrix
+npm run test:browser             # private app, 24 groups (needs Edge/Chromium; QUOTETEND_BROWSER_PATH for another build)
+npm run test:security:browser
 npm run test:public:browser
+npm run test:calendar:browser
+# Any suite under another machine zone (TZ in the shell does not accept IANA names for Node on Windows):
+QUOTETEND_TEST_TZ=Pacific/Kiritimati node --import ./tests/helpers/set-timezone.mjs --test tests/*.test.mjs
+QUOTETEND_TEST_TZ=America/Chicago QUOTETEND_BROWSER_TZ=UTC node --import ./tests/helpers/set-timezone.mjs tests/browser-rehearsal.mjs
+# PowerShell: $env:QUOTETEND_TEST_TZ='Pacific/Kiritimati'; node --import ./tests/helpers/set-timezone.mjs --test (Get-ChildItem tests/*.test.mjs)
 git log --reverse --stat dbf9242..HEAD
 ```

@@ -6,7 +6,7 @@ Available in private local accounts through **Follow-up Results**. The separate 
 
 The date range filters reported contact dates. Contacts logged includes repeat contacts. The cohort consists of distinct current estimates whose earliest reported contact date in the current reporting period falls in the range; ties on a date use server recording order. Backdated contacts can change cohort membership. The estimate value is the amount stored when that contact was logged, not an independently verified past valuation.
 
-Won/lost/open/uncertain classifications are current as of the server's local date, not historical state at the filter end. An outcome qualifies only if a contact was recorded before it and the reported outcome date is on or after that contact's date. Same-day results establish recording sequence only. Outcomes without adequate chronology are uncertain. Reopened estimates are open again. Closed amount corrections update won value while preserving the outcome's original date and order; explicit outcome-date correction is available in the detail dialog.
+Won/lost/open/uncertain classifications are current as of the Oregon business day (America/Los_Angeles), not historical state at the filter end. An outcome qualifies only if a contact was recorded before it and the reported outcome date is on or after that contact's date. Same-day results establish recording sequence only. Outcomes without adequate chronology are uncertain. Reopened estimates are open again. Closed amount corrections update won value while preserving the outcome's original date and order; explicit outcome-date correction is available in the detail dialog.
 
 Won share divides qualifying won estimates by the entire cohort, including open and uncertain records. It is not a causal conversion rate. Current overdue value is a separate snapshot independent of the date filter: sent, eligible estimates with dates before today. It is not predicted loss.
 
@@ -38,7 +38,7 @@ Workspace JSON backup remains version 1 and preserves estimates, drafts and disp
 
 ## Deliberate limits
 
-- Server-local calendar dates; no per-business timezone configuration. This local installation uses the computer timezone.
+- One business calendar, America/Los_Angeles, used by browser and server regardless of the server's TZ or the browser's zone (Sprint 3A.1). Owner-entered dates are civil dates and never shift; recorded timestamps are UTC instants; only instant-to-day conversion (today, the reporting period's start) uses the business zone. No per-business timezone configuration yet.
 - No historical “as of” dashboard, payment evidence, provider-confirmed sending, automatic follow-ups or causal attribution.
 - Current-period server contacts can now be corrected or voided in estimate details. A reason is required and original evidence remains. Voids leave counts/cohorts; corrected dates may change cohort membership. Reinstatement retains original recording order and amount-at-log. Next follow-up is unchanged. Imported display history is not editable measurement evidence; unknown legacy last-contact summaries remain unverified.
 - Prior reporting periods remain queryable in the authenticated event API/database but have no UI selector yet.

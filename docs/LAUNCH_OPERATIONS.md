@@ -14,7 +14,7 @@ Production refuses to start without an HTTPS PUBLIC_ORIGIN, a SESSION_SECRET at 
 
 Use a randomly generated secret (e.g. node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))") in private administrator tooling. Store it in the hosting secret field/password manager, never a repository or ticket. Verify a provider-generated value meets the length requirement. Production cookies are Secure, HttpOnly, SameSite=Strict, scoped to /api; HSTS and same-origin write checks are enabled. No cross-origin API is supported. No API keys for Stripe or mail providers are needed.
 
-TZ=America/Chicago deliberately makes all first-pilot dates Central Time. There is no per-business timezone yet; tell owners this before selling across timezones.
+Business dates use one fixed calendar, America/Los_Angeles (Pacific Time), set in code (BUSINESS_TIME_ZONE in domain.js). The service's TZ variable no longer affects any business date, so the existing `TZ=America/Chicago` value in the hosting configuration is inert for QuoteTend and should be removed or aligned by whoever next edits that configuration. There is no per-business timezone yet; tell owners outside Pacific Time before selling across timezones.
 
 ## Owner access and recovery
 
