@@ -137,7 +137,7 @@ test('stale, replayed, malformed and tampered commands are refused or idempotent
   const snap = H.fingerprint(env, A);
   // Revision and request-ID tampering.
   for (const revision of [-1, 1.5, '9', null, undefined, NaN, Infinity, 2 ** 60, [1], { n: 1 }]) { const r = await send({ ...edit({ notes: 'x' }), revision }); assert.equal(r.status, 400, String(revision)); }
-  for (const requestId of ['', 'short', 'a'.repeat(81), 'has space in it 1234567', 'semi;colon-1234567890', null, undefined]) assert.equal((await send({ ...edit({ notes: 'x' }), requestId })).status, 400, String(requestId));
+  for (const requestId of ['', 'short', 'a'.repeat(81), 'has space in it 1234567', 'semi;colon-1234567890', 12345678901234567, null, ['a'.repeat(20)], undefined]) assert.equal((await send({ ...edit({ notes: 'x' }), requestId })).status, 400, String(requestId));
   for (const body of [[], 'x', null, 7, { kind: 'delete-everything', requestId: randomUUID(), revision: rev() }, { kind: ['edit'], requestId: randomUUID(), revision: rev() }, { kind: 'constructor', requestId: randomUUID(), revision: rev() }, { requestId: randomUUID(), revision: rev() }]) assert.equal((await send(body)).status, 400, JSON.stringify(body));
   assert.equal(H.fingerprint(env, A), snap, 'rejected commands left no trace');
   // Stale revision: refused with a specific code and nothing applied.
