@@ -105,7 +105,12 @@ export async function accountAPI(store, port, config={}) {
   api.get('/workspaces/:businessId/results', (req,res)=>{
     try {res.json(store.results(req.owner.business_id,req.query.from,req.query.to));}catch(e){res.status(400).json({error:e.message});}
   });
-  api.get('/workspaces/:businessId/events', (req,res)=>res.json(store.events(req.owner.business_id)));
+  // The ledger numbers events across every business. Callers get this business's own 1..n ordinals so the gaps
+  // cannot reveal how much other contractors are doing; internal ordering and stored references are unchanged.
+  api.get('/workspaces/:businessId/events', (req,res)=>{
+    const events=store.events(req.owner.business_id),ordinal=new Map(events.map((e,i)=>[e.sequence,i+1]));
+    res.json(events.map(e=>({...e,sequence:ordinal.get(e.sequence),...(e.data.outcomeSequence!==undefined?{data:{...e.data,outcomeSequence:ordinal.get(e.data.outcomeSequence)}}:{})})));
+  });
   api.get('/workspaces/:businessId/snapshots', (req,res)=>res.json(store.snapshots(req.owner.business_id)));
   api.get('/workspaces/:businessId/snapshots/:snapshotId', (req,res)=>{
     const snapshot=store.snapshot(req.owner.business_id,req.params.snapshotId);

@@ -157,3 +157,20 @@ test('events and results contain only the caller\'s business, with no cross-tena
     eventId: eventsB.data.filter(e => e.type === 'contact_logged').at(-1).id, correction: { date: H.today, channel: 'Phone', voided: false, reason: 'Fictional channel fix' } });
   assert.equal(correction.status, 200);
 });
+
+test('event ordinals returned to a business are its own, so gaps cannot reveal another contractor\'s activity', async t => {
+  const { env, ca, cb, A, B } = await twoTenants(t);
+  const eventsA = (await ca.get(`/api/workspaces/${A}/events`)).data, eventsB = (await cb.get(`/api/workspaces/${B}/events`)).data;
+  assert.equal(eventsA.length, eventsB.length, 'symmetric fixtures: any difference in numbering would be exposure of the other tenant');
+  // B was seeded after A. The database numbers events globally, but a caller must only ever see 1..n for its own events.
+  assert.deepEqual(eventsB.map(e => e.sequence), eventsB.map((_, i) => i + 1));
+  assert.deepEqual(eventsA.map(e => e.sequence), eventsA.map((_, i) => i + 1));
+  const sequences = new Set(eventsB.map(e => e.sequence));
+  const references = eventsB.filter(e => e.data.outcomeSequence !== undefined);
+  for (const e of references) assert.ok(sequences.has(e.data.outcomeSequence), 'outcome references point at the same business\'s events');
+  // Activity by A after B's last event must not change anything B can observe.
+  H.commander(env, env.store.ownerByEmail('owner-a@example.com'))('edit', { estimateId: 'A-EST-3', fields: { notes: 'later A-only activity' } });
+  assert.deepEqual((await cb.get(`/api/workspaces/${B}/events`)).data, eventsB);
+  // Internal ordering is unchanged: the ledger still reports contacts in the order they happened.
+  assert.deepEqual(env.store.events(B).map(e => e.id), eventsB.map(e => e.id));
+});
