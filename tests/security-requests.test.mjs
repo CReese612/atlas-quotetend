@@ -111,6 +111,25 @@ test('errors and logs never carry stack traces, SQL, file paths, credentials or 
   for (const needle of ['owner-a@example.com', 'owner-b@example.com', H.PASSWORD, ...H.leakPatterns('A'), ...H.leakPatterns('B'), 'SQL-FAULT', 'quotetend.sid', 'password_hash', '$2a$', '$2b$', A, '/api/']) assert.ok(!logged.includes(needle), 'log contains ' + needle);
 });
 
+test('request bodies are bounded before the caller is authenticated or authorized', async t => {
+  const { env, A, B, session } = await setup(t);
+  const anonymous = H.client(env), garbage = 'x'.repeat(3_000_000);
+  // A multi-megabyte unparseable body must be turned away on identity grounds without ever being parsed.
+  const unauthorized = await anonymous.send(`/api/workspaces/${A}/commands`, 'POST', undefined, {}, { raw: garbage });
+  assert.equal(unauthorized.status, 401, 'the workspace parser never runs for an anonymous caller: ' + unauthorized.text.slice(0, 80));
+  for (const path of ['/api/password', '/api/recovery-code']) assert.equal((await anonymous.send(path, 'POST', undefined, {}, { raw: garbage })).status, 413, path + ' accepts only tiny bodies');
+  const foreign = await session.send(`/api/workspaces/${B}/commands`, 'POST', undefined, {}, { raw: garbage });
+  assert.equal(foreign.status, 404, 'a signed-in caller aiming at another business is refused before the body is read');
+  // Sign-in, registration and recovery bodies are tiny; a 100 KB body is refused outright.
+  const padded = { email: 'owner-a@example.com', password: H.PASSWORD, pad: 'y'.repeat(100_000) };
+  for (const path of ['/api/login', '/api/register', '/api/recover']) { const r = await anonymous.post(path, padded); assert.equal(r.status, 413, path); assert.doesNotMatch(r.text, /Workspace/); }
+  // Legitimate use is unaffected: a large (but valid) workspace command from the owner still works up to the limit.
+  const big = { kind: 'draft', estimateId: 'A-EST-1', text: 'z'.repeat(9_999), requestId: randomUUID(), revision: env.store.workspace(A).revision };
+  assert.equal((await session.post(`/api/workspaces/${A}/commands`, big)).status, 200);
+  const oversize = await session.send(`/api/workspaces/${A}/commands`, 'POST', undefined, {}, { raw: JSON.stringify({ kind: 'restore', quotes: [], pad: 'p'.repeat(5_100_000) }) });
+  assert.equal(oversize.status, 413);
+});
+
 test('stale, replayed, malformed and tampered commands are refused or idempotent and never half-applied', async t => {
   const { env, A, sa, session } = await setup(t);
   const url = `/api/workspaces/${A}/commands`, rev = () => env.store.workspace(A).revision, send = (body, headers) => session.post(url, body, headers);

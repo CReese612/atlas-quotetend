@@ -26,7 +26,10 @@ export async function accountAPI(store, port, config={}) {
     }
     next();
   });
-  api.use(express.json({ limit: 5_000_000 }));
+  // Bodies are bounded before anyone is identified: sign-in, recovery and password bodies are tiny, and the 5 MB
+  // workspace parser only runs after the caller is authenticated and addressing their own business (below).
+  const small = express.json({ limit: '16kb' }), large = express.json({ limit: 5_000_000 });
+  api.use((req, res, next) => req.path.startsWith('/workspaces/') ? next() : small(req, res, err => err?.type === 'entity.too.large' ? res.status(413).json({ error: 'Request is too large.' }) : next(err)));
   api.use(session({ name: cookieName, secret: config.secret || store.secret, store: new SQLiteSessions(store.db),
     resave: false, saveUninitialized: false,
     cookie: { httpOnly: true, sameSite: 'strict', secure: !!config.production, path: '/api', maxAge: HOURS_8 } }));
@@ -98,6 +101,7 @@ export async function accountAPI(store, port, config={}) {
     if (req.params.businessId !== req.owner.business_id) return res.status(404).json({ error: 'Workspace not found.' });
     next();
   });
+  api.use('/workspaces/:businessId', large);
   api.get('/workspaces/:businessId', (req, res) => res.json(store.workspace(req.owner.business_id)));
 
   api.put('/workspaces/:businessId', (req,res)=>res.status(405).json({error:'Reload QuoteTend. Whole-workspace saves are disabled; use focused operations or explicit restore.'}));
