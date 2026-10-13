@@ -14,7 +14,8 @@ import { demoData, addDays, todayISO } from '../../domain.js';
 export const PASSWORD = 'Fictional-sec-password-4821!';
 export const OTHER_PASSWORD = 'Fictional-sec-replacement-7730!';
 // Cost 4 is bcryptjs' minimum: fixtures sign in through the real login route without paying for cost 12.
-const FAST_HASH = bcrypt.hashSync(PASSWORD, 4);
+// Each owner gets its own salt, like production, so no two owners share a password hash.
+const fastHash = () => bcrypt.hashSync(PASSWORD, 4);
 export const today = todayISO();
 export const PROD_ORIGIN = 'https://fictional.example';
 
@@ -67,7 +68,7 @@ export const signIn = async (env, email, password = PASSWORD) => {
 };
 
 // Create an owner directly in the database (not through /api/register) to keep auth-route rate limits free.
-export const addOwner = (env, email, businessName) => env.store.createOwner(email, FAST_HASH, businessName);
+export const addOwner = (env, email, businessName) => env.store.createOwner(email, fastHash(), businessName);
 
 export function commander(env, owner) {
   return (kind, args = {}) => env.store.command(owner, { kind, requestId: randomUUID(), revision: env.store.workspace(owner.business_id).revision, ...args });
