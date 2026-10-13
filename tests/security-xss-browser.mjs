@@ -17,6 +17,8 @@ const dir = await mkdtemp(join(tmpdir(), 'quotetend-xss-test-'));
 const password = 'Fictional-xss-password-5530!', today = todayISO();
 const removeDir = () => dirname(dir) === tmpdir() && basename(dir).startsWith('quotetend-xss-test-') ? rm(dir, { recursive: true, force: true }) : undefined;
 const running = await startServer({ port: 0, dbPath: join(dir, 'accounts.sqlite'), logger: () => {}, config: { ...configuration({}), backupDir: join(dir, 'backups') } });
+// QUOTETEND_BROWSER_TZ (an IANA name) sets the browser's own zone so runs can prove the app does not depend on it.
+const BROWSER_TZ = process.env.QUOTETEND_BROWSER_TZ ? { timezoneId: process.env.QUOTETEND_BROWSER_TZ } : {};
 let browser;
 const stopServer = async () => { const closing = running.close(); running.server.closeAllConnections(); await closing; };
 try {
@@ -41,7 +43,7 @@ try {
   run('correct-contact', { estimateId: 'XSS-2', eventId: contact.id, correction: { date: today, channel: 'Email', voided: false, reason: payloads.script + payloads.img } });
   run('restore', { quotes: running.store.workspace(owner.business_id).quotes, confirmReplacement: true });
 
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const context = await browser.newContext({ ...BROWSER_TZ, viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   const pageErrors = [], violations = [], dialogs = [];
   page.on('pageerror', e => pageErrors.push(e.message));
