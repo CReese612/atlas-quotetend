@@ -12,5 +12,8 @@ if(action==='create' && first) {
 else if(action==='restore-copy' && first && second) {
  if(resolve(first)===resolve(second)||existsSync(second))throw new Error('Restore requires a NEW isolated destination; no overwrite allowed.');
  verifyBackup(resolve(first));copyFileSync(resolve(first),resolve(second),constants.COPYFILE_EXCL);
+ // A backup contains the sessions that were live when it was taken. Restoring must not bring anyone back signed in
+ // (for example a session hijacked before an incident); owners sign in again with their existing passwords.
+ const restored=new DatabaseSync(resolve(second));try{restored.exec('DELETE FROM sessions');}finally{restored.close();}
  console.log(verifyBackup(resolve(second)));
 }else throw new Error('Usage: node backup-accounts.mjs create BACKUP_DIRECTORY | verify FILE | restore-copy FILE NEW_DATABASE');
