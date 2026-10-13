@@ -383,7 +383,7 @@ async function showSnapshots() {
   box.innerHTML = '<div class="loading-line"><span class="spinner" aria-hidden="true"></span>Loading safety copies…</div>';
   try {
     const rows = await request('/workspaces/' + encodeURIComponent(ws.businessId) + '/snapshots');
-    box.innerHTML = rows.length ? `<ul class="snapshot-list">${rows.map(r => `<li><span>Saved before a restore on <strong>${esc(new Date(r.recordedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }))}</strong></span><button class="qt-btn qt-btn--sm" type="button" data-action="snapshot-download" data-id="${esc(r.id)}">${icon('download')}Download</button></li>`).join('')}</ul><p class="qt-help">Restore a safety copy with “Choose workspace export…”.</p>`
+    box.innerHTML = rows.length ? `<ul class="snapshot-list">${rows.map(r => `<li><span>Saved before a restore on <strong>${esc(new Date(r.recordedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: D.BUSINESS_TIME_ZONE }))}</strong></span><button class="qt-btn qt-btn--sm" type="button" data-action="snapshot-download" data-id="${esc(r.id)}">${icon('download')}Download</button></li>`).join('')}</ul><p class="qt-help">Restore a safety copy with “Choose workspace export…”.</p>`
       : '<p class="qt-help">No restores have been made, so there are no safety copies.</p>';
   } catch (error) { box.innerHTML = `<p class="qt-form__error">${esc(error.message)}</p>`; }
 }

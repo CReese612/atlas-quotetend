@@ -1,4 +1,4 @@
-import { eligible, validDate, addDays } from './domain.js';
+import { eligible, validDate, addDays, businessDateOf } from './domain.js';
 
 // Apply amendments without deleting original evidence or changing recording order.
 export function contactEvidence(events) {
@@ -66,7 +66,7 @@ export function contactsPerWeek(contacts, today) {
 // is never evidence of zero activity: an empty one just means nothing was entered. Returns null when every
 // displayed week lies inside the period, otherwise { kind, text }.
 export function weeklyCoverage(weeks, startedAt, format = date => date) {
-  const started = String(startedAt).slice(0, 10);
+  const started = businessDateOf(startedAt); // an instant becomes its Oregon business day; a civil date is kept
   if (!weeks.length || !(started > weeks[0].start)) return null;
   const earlier = weeks.filter(w => w.end < started);
   const backdated = earlier.reduce((total, w) => total + w.count, 0);

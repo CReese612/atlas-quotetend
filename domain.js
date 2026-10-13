@@ -12,7 +12,27 @@ export const CHANNELS = ['Email', 'Phone', 'Text', 'Other'];
 // Optional owner-reported result of a logged contact. Every option is a real contact with the customer.
 export const CONTACT_RESULTS = Object.freeze({ spoke: 'Spoke with customer', left_message: 'Left a message', messaged: 'Sent a message' });
 export const withOptionalFields = q => ({ ...q, ...Object.fromEntries(OPTIONAL_FIELDS.map(k => [k, q[k] ?? ''])) });
-export const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+// ONE business calendar for the whole product (browser and server). The first customers are in Oregon, so a "day" is an
+// America/Los_Angeles day, however the server's TZ or the visitor's browser is set; neither is ever consulted.
+//  - Owner-entered YYYY-MM-DD values are civil dates: they are stored, compared and displayed as written, never shifted.
+//  - Recorded timestamps (events, sessions, measurement starts) are UTC instants.
+//  - Only turning an instant into a day (todayISO, the reporting period's start) uses the business zone, via the
+//    IANA database (daylight saving included), never a fixed offset.
+// A later per-business zone only needs to pass its IANA name here; stored data does not change.
+export const BUSINESS_TIME_ZONE = 'America/Los_Angeles';
+const dayFormats = new Map();
+const dayFormat = zone => { if (!dayFormats.has(zone)) dayFormats.set(zone, new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' })); return dayFormats.get(zone); };
+// The business day (YYYY-MM-DD) of an instant: a Date, epoch milliseconds, or an ISO string that carries an offset
+// ("...Z"). A bare YYYY-MM-DD is already a civil date and is returned unchanged.
+export function businessDateOf(value, zone = BUSINESS_TIME_ZONE) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const ms = value instanceof Date ? value.getTime() : typeof value === 'number' ? value
+    : typeof value === 'string' && /(Z|[+-]\d{2}:?\d{2})$/i.test(value) ? Date.parse(value) : NaN;
+  if (!Number.isFinite(ms)) throw new RangeError('Expected a valid instant (Date, epoch milliseconds or an ISO timestamp with an offset) or a YYYY-MM-DD date.');
+  const parts = Object.fromEntries(dayFormat(zone).formatToParts(ms).map(p => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+export const todayISO = () => businessDateOf(Date.now());
 export function addDays(date, days) { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); }
 export function validDate(value) { if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false; const d = new Date(`${value}T12:00:00Z`); return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === value; }
 export const emailKey = email => String(email || '').trim().toLowerCase();
