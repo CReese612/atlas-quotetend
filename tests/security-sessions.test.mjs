@@ -148,6 +148,7 @@ test('session lifetime: exact eight-hour boundary and store expiry, with time fr
   write({ started: NOW }, NOW + 1); assert.equal((await session.get('/api/me')).status, 200, 'store row valid for one more millisecond');
   write({ started: NOW }, NOW); assert.equal((await session.get('/api/me')).status, 401, 'store expiry is exclusive');
   write({ started: NOW }, NOW - 1); assert.equal((await session.get('/api/me')).status, 401);
+  write({ started: NOW + 1 }, NOW + 1); assert.equal((await session.get('/api/me')).status, 401, 'a start time in the future cannot stretch the eight-hour limit');
   write({ started: NaN }, NOW + 1); assert.equal((await session.get('/api/me')).status, 401, 'NaN serialises to null and is not a start time');
   t.mock.restoreAll();
   assert.equal(a.id.length > 0, true);
@@ -160,8 +161,8 @@ test('inconsistent session records are refused: wrong owner, stale credentials, 
   const put = patch => { const data = { ...original, ...patch }; for (const k of Object.keys(patch)) if (patch[k] === undefined) delete data[k]; db.prepare('UPDATE sessions SET data=? WHERE sid=?').run(JSON.stringify(data), sid); };
   assert.equal((await session.get('/api/me')).status, 200);
   const cases = { 'owner swapped to B, A\'s credential version': { ownerId: b.id }, 'credential version of another owner': { credentialVersion: tokenHash(env.store.ownerById(b.id).password_hash) },
-    'credential version missing': { credentialVersion: undefined }, 'start time missing': { started: undefined }, 'owner id missing': { ownerId: undefined },
-    'owner id unknown': { ownerId: randomUUID() }, 'business id injected': { businessId: b.business_id, ownerId: b.id } };
+    'credential version missing': { credentialVersion: undefined }, 'start time missing': { started: undefined }, 'start time not a number': { started: 'yesterday' }, 'owner id missing': { ownerId: undefined },
+    'owner id unknown': { ownerId: randomUUID() }, 'owner id wrong type': { ownerId: { id: a.id } }, 'business id injected': { businessId: b.business_id, ownerId: b.id } };
   for (const [label, patch] of Object.entries(cases)) { put(patch); const r = await session.get('/api/me'); assert.equal(r.status, 401, label); assert.ok(!r.text.includes('owner-b@example.com'), label); }
   put({}); assert.equal((await session.get('/api/me')).status, 200, 'the control record is valid again');
 });

@@ -70,8 +70,10 @@ export async function accountAPI(store, port, config={}) {
     });
   });
   api.use((req, res, next) => {
-    const owner = req.session.ownerId && store.ownerById(req.session.ownerId);
-    if (!owner || store.suspended(owner.id) || req.session.credentialVersion!==tokenHash(owner.password_hash) || !req.session.started || Date.now() - req.session.started >= HOURS_8) {
+    const owner = typeof req.session.ownerId==='string' && store.ownerById(req.session.ownerId);
+    // The start time must be a real moment no later than now: a non-numeric or future value would otherwise skip the eight-hour limit.
+    const started=req.session.started,age=Date.now()-started;
+    if (!owner || store.suspended(owner.id) || req.session.credentialVersion!==tokenHash(owner.password_hash) || typeof started!=='number' || !(age>=0 && age<HOURS_8)) {
       return res.status(401).json({ error: 'Please sign in again. Unsaved changes have not been applied.' });
     }
     req.owner = owner; next();
