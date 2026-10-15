@@ -11,7 +11,17 @@ Render setting or render.yaml value was changed, no pull request was opened, and
 | --- | --- |
 | `c67d969a4a6bc341b16f8d1a428e06a034b1ef46` | test(server): reproduce shutdown hang |
 | `60d8aee912efb93f07d48534531b04e3f9af92b9` | fix(server): bound graceful shutdown |
-| (this document) | docs(ops): document shutdown and recovery |
+| `4701016537c2dd5f45d2f02e3d2eed1a137a81a4` | docs(ops): document shutdown and recovery |
+| `4140b41dcf3a5bc64def2e6da9bfe6a7f606f0fe` | test(server): cover accepted pipelined drain (3B.1a) |
+| `082e6877663d713705fa45841da4b748252d9f57` | fix(server): preserve in-flight request lifecycle (3B.1a) |
+| `fc15bf13f94b52f68f79822858d3e8bd6bcc4c61` | fix(server): clean failed startup resources (3B.1a) |
+| (this update) | docs(ops): clarify shutdown and backup contract (3B.1a) |
+
+> **Update — Sprint 3B.1a (Codex audit remediation).** Independent Codex QA of `4701016` returned NO-GO for three
+> findings: P1-001 (pipelined requests lost their responses and shutdown reported clean while a handler still ran);
+> P2-001 (direct `close()` unbounded behind a stalled backup); and P2-002 (a startup failure leaked SQLite). Section 7
+> has the reproduction, root causes, fixes, the shutdown and backup contract, and before/after evidence. Sections 1–6
+> describe Sprint 3B.1 as first delivered; where section 7 changes them, section 7 applies.
 
 ## 1. The defect, reproduced
 
@@ -142,3 +152,150 @@ sockets in their own `stopServer` helpers; that is harmless with the fix and was
    Measure downtime, confirm `/healthz` and a fictional save after restart, and confirm the effective shutdown delay
    for a disk-backed service.
 4. Review whether 10 s / 15 s is right once real request durations on the starter plan are known.
+
+## 7. Sprint 3B.1a — Codex audit remediation
+
+Started from `4701016537c2dd5f45d2f02e3d2eed1a137a81a4` (local and remote equal; `bfb5acc` verified as an ancestor).
+The full independent report (`QuoteTend-QA/test-results/sprint3b1-independent-audit/REPORT.md`) and its probe sources
+(`independent-probes.mjs`, `async-and-concurrent-probes.mjs`, `resource-probes.mjs`) were read; the QA directory was
+not modified. Codex's probes were not re-run here because they write into its evidence directory. A separate scratch
+reproduction used the same connection patterns and the same injection points (the second `bcrypt.hash`, the `mkdir`
+that starts a backup, a rejecting `bcrypt.hash` during `accountAPI()` setup).
+
+### 7.1 Reproduction on `4701016` (Windows 11, Node 24.19.0)
+
+| Finding | Pattern | Observed |
+| --- | --- | --- |
+| P1-001, natural | Two `POST /api/register` pipelined on one connection, both accepted, then `close()` (3 s grace) | One `201` delivered; both owners committed; `{ forced: false }` after 488 ms |
+| P1-001, controlled | Same, with the second request's password hash held | `close()` resolved `{ forced: false }` after 246 ms while the hash was held; SQLite already closed; after release only one owner existed and one response had been sent |
+| P2-002 | `bcrypt.hash` rejects during `accountAPI()` setup | Original error kept, but SQLite still open (file deletion `EPERM`) and the backup schedule not stopped |
+| P2-001 | The `mkdir` of a running backup held; `close()` with a 75 ms grace | Still pending after 1.5 s; listener stopped; SQLite open; resolved `{ forced: false }` only after release |
+
+### 7.2 Root causes
+
+* **P1-001.** The drain set `Connection: close` on every response a connection still owed. Node ends a connection
+  after any response marked that way, so later pipelined responses, already accepted, were never sent. The clean
+  condition was the server's `'close'` event, which only means every socket has closed. That treated socket closure
+  as proof the work had finished, but a handler awaiting `bcrypt.hash` keeps running after its socket is gone.
+* **P2-002.** Startup cleanup covered the initial backup and `listen()` only. `accountAPI()` setup ran between them.
+* **P2-001.** `backups.stop()` awaits a running backup. Nothing bounds that wait, and the backup cannot safely be cut
+  short (7.4).
+
+### 7.3 Changes (`server.mjs`)
+
+* **Requests are accounted for apart from sockets.** Every accepted request (Node's `'request'` event) stays
+  `unfinished` until its handler calls `res.end()`, whether or not the client is still connected. The server now has
+  one request listener, which records the request and then calls the Express app.
+* **Only the last response a connection owes says `Connection: close`** during shutdown. That is decided when the
+  response writes its headers, so earlier pipelined responses stay keep-alive and are delivered. A request that arrives
+  after a response has said `Connection: close` is not dispatched (RFC 9112 §9.6). The server has announced it will not
+  answer it, so running it would be accepted work with no response.
+* **Clean means every connection has closed and every accepted handler has finished**, within the grace period. At the
+  deadline the remaining connections are destroyed. The result and logs report `unfinished`, the handlers still
+  running when SQLite closed.
+* **`shutdown_waiting_for_backup`** is logged when the drain is over but a backup is still running.
+* **Startup.** `startServer()` opens SQLite, creates the backup schedule and calls `serve()`, which is the unchanged
+  app and listener setup. Any failure after the database opens stops the schedule, closes SQLite and rethrows the
+  original error.
+
+Unchanged: the 10 s grace, the 15 s watchdog, exit codes, session and CSRF handling, schema 3, request idempotency,
+routes and responses. The clean/forced distinction is preserved; `close()` now resolves to
+`{ forced, unfinished, durationMs }`.
+
+### 7.4 The shutdown and backup contract
+
+| | `close()` in code | `node server.mjs` + SIGTERM/SIGINT |
+| --- | --- | --- |
+| HTTP drain | At most `shutdownGraceMs` (10 s), then forced | Same |
+| Running backup | Waited for with no time limit, logging `shutdown_waiting_for_backup`; SQLite never closed under it | Same wait, ended by the 15 s watchdog |
+| SQLite | Closed once, after the drain and any running backup | Same; if the watchdog fires first it is not closed by the app and the OS releases it at exit |
+| Result | `{ forced, unfinished, durationMs }`; rejects only if a stage failed | Exit 0 clean, 1 forced or failed; watchdog: `shutdown_watchdog_expired`, exit 1, no `shutdown_complete` |
+
+**Why the backup wait is not bounded.** Node 24's `sqlite.backup()` accepts `source`, `target`, `rate` and `progress`
+only. It has no abort signal, and its documentation says the source database must be open. Closing SQLite under it is
+therefore outside the documented contract. In one local experiment on Node 24.19, `db.close()` called from the
+`progress` callback returned normally and the backup still completed with an intact copy. That behaviour is
+undocumented and is not relied on. A bounded `close()` that left SQLite open and resolved early would hand callers a
+"finished" promise while the database and the backup were still live. So direct `close()` is deliberately unbounded
+behind a running backup, and says so in its log; the process entry point is bounded by the watchdog. This is a
+documented P2 constraint, shown by the two `P2-001 contract` tests.
+
+**Forced shutdown and late handlers.** Destroying a connection does not cancel JavaScript. A handler still running at
+the deadline carries on. Every write in QuoteTend is a single synchronous transaction (no `BEGIN … COMMIT` spans an
+`await`; ledger.mjs, account-store.mjs and account-security.mjs contain no `await`), so SQLite is never closed
+mid-transaction. Such a handler's next database call throws "database is not open" before any statement runs.
+Express handles that error, so there is no unhandled rejection, and the client, already disconnected, receives
+nothing. Through the signal entry point the process then exits. A request with several transactions can have
+committed some before the deadline (for example an account created, the session not); no confirmation was sent.
+
+### 7.5 New tests (`tests/server-shutdown.test.mjs`)
+
+| Test | Requirement | How |
+| --- | --- | --- |
+| P1-001 natural | A, B, C, H | Two registrations pipelined on one connection, both accepted before `close()`; both `201` (first keep-alive, second `Connection: close`); `{ forced: false, unfinished: 0 }`; 2 owners; integrity ok |
+| P1-001 controlled | D, E (repeat close) | Second hash held: the first response arrives keep-alive; `close()` still pending, SQLite open, connection open; a repeated `close()` returns the same promise; after release the second `201` arrives and shutdown is clean |
+| P1-001 control | separate sockets | One request per connection, one held: the other is answered and its connection closes, while shutdown waits for the held one |
+| client disconnects | F | Client destroys its connection while its request is held; the server's `'close'` fires but `close()` stays pending with SQLite open until the handler finishes; the owner is committed |
+| deadline, unfinished | G, H, I, J | 200 ms grace, hash held: `{ forced: true, unfinished: 1 }`, `shutdown_deadline` with `unfinished: 1`; no response bytes; after release `createOwner` throws "not open"; 0 owners; integrity ok; no unhandled rejections; no private values in logs |
+| P2-002 | Task B | `bcrypt.hash` rejects in `accountAPI()` setup: original error; the 6-hour backup interval was cleared; no extra handles; startup backup present; database reopens with integrity ok; file deletable |
+| P2-002 guard | Task B | A failed initial backup still reports "Initial backup failed; server not started." and releases SQLite |
+| P2-001 contract, direct | Task C | `mkdir` of a running backup held: `shutdown_waiting_for_backup`, `close()` pending, listener stopped, SQLite open; after release the backup verifies, no `.partial`, then SQLite closes |
+| P2-001 contract, signal | Task C | Same stall via `handleShutdownSignals` with SIGTERM then SIGINT: at 15 s (mock timers) exit 1 once, `shutdown_watchdog_expired`, no `shutdown_complete`, SQLite still open; later completion causes no second exit |
+
+Held work uses gated mocks (`bcrypt.hash`; `mkdir` re-bound with `syncBuiltinESMExports()`), not sleeps. The one
+real timer is the 200 ms forced-path grace, which is the deadline under test. Polling waits count event-loop turns,
+not milliseconds.
+
+### 7.6 Evidence
+
+| Run | Result |
+| --- | --- |
+| Final test file vs `4701016` `server.mjs`, disposable worktree | 28 tests: 20 pass, **8 fail**, natural exit in 19.6 s. Behavioural failures: the second pipelined response is lost (natural); the first response says `close` (controlled); shutdown settles while a disconnected client's handler runs; the backup interval is not cleared (P2-002). Interface failures: `unfinished` absent (separate-socket control, whose behaviour already matched Codex's control; deadline test); `shutdown_waiting_for_backup` absent (both P2-001 contract tests; the wait itself existed). The P2-002 guard passes there, as expected |
+| Final test file vs fix (`fc15bf1`) | 28/28, 9.2 s; also 28/28 in each of 3 sequential and 6 concurrent runs (load check) |
+| Scratch reproduction vs fix | P1 natural: two `201` (keep-alive, close), 2 owners, `{ forced: false, unfinished: 0 }`. P1 controlled: `close()` still pending after 1.5 s with SQLite open, then two `201`, 2 owners. P2-002: SQLite released. P2-001: unchanged by design (pending, SQLite open, completes on release). No unhandled rejections |
+
+### 7.7 Regression at `fc15bf13f94b52f68f79822858d3e8bd6bcc4c61` (Windows 11, Node 24.19.0)
+
+| Command | Result | Wall time |
+| --- | --- | --- |
+| `node --test tests/server-shutdown.test.mjs` | 28/28 (19 Sprint 3B.1 + 9 new) | 9.4 s |
+| `npm test` | 182/182, 0 fail/cancelled/skipped/todo | 15.0 s |
+| `npm run test:browser` | 24/24 groups | 26.2 s |
+| `npm run test:restore:browser` | 8/8 checks | 3.9 s |
+| `npm run test:calendar:browser` | 4/4 scenarios | 8.0 s |
+| `npm run test:security:browser` | 16/16 checks | 8.5 s |
+| `npm run test:public:browser` | 27/27 groups | 130.0 s |
+
+Every command exited 0 on its own; none timed out, none was skipped, and nothing was unreached. No existing test
+or assertion was weakened. The shared helpers gained a multi-response parser, a log-event waiter and a cleanup hook.
+
+### 7.8 Outstanding
+
+* **P0:** none known.
+* **P1:** none known locally; P1-001 awaits Codex re-audit.
+* **P2, accepted as documented constraints:**
+  * Direct `close()` is unbounded behind a running backup (7.4).
+  * The JavaScript watchdog cannot fire while the event loop is blocked.
+  * Signals during startup are not intercepted.
+  * The express-rate-limit memory store keeps an unref'd timer.
+  * A forced shutdown leaves late handlers running until their next database call.
+* **Request accounting assumption:** accounting relies on handlers ending their responses. A handler that never calls
+  `res.end()` is reported `unfinished` until the deadline, which makes the shutdown forced. That is truthful, but slow.
+* **Defensive path:** the RFC 9112 rule (a request after `Connection: close` is not dispatched) has no deterministic
+  local test. The window between that response and the socket ending is too small to hit on purpose.
+* **Verification gaps:** genuine Linux SIGTERM/SIGINT delivery is untested (Windows bridge only), as are all hosted
+  questions in LAUNCH_OPERATIONS.
+
+### 7.9 Focused re-audit plan
+
+1. Run Codex's `independent-probes.mjs` pipeline cases and `async-and-concurrent-probes.mjs` against the new SHA.
+   Expect two `201` responses, `close()` pending while the second hash is held, and a clean result only after both
+   finish. A forced run should report `unfinished` and send no response.
+2. Run `resource-probes.mjs`. Expect the startup-initialization failure to leave the database deletable. The
+   stalled-backup direct close should stay pending by contract, now with `shutdown_waiting_for_backup`; the signal
+   watchdog should exit 1 without `shutdown_complete`.
+3. Rerun the negative control: the final `tests/server-shutdown.test.mjs` against `4701016` `server.mjs` (8 failures
+   expected, as in 7.6).
+4. On Linux, run the unchanged test file with genuine signals.
+5. Review the request-accounting assumption and the RFC 9112 guard in 7.8. Review whether the 7.4 contract is
+   acceptable, or whether a bounded direct `close()` is required despite the backup API.
