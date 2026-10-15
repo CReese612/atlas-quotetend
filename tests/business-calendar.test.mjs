@@ -153,3 +153,40 @@ test('over HTTP, effective dates, asOf and the 401/400 behaviour follow the Oreg
   assert.ok(events.filter(e => ['estimate_created', 'status_changed'].includes(e.type)).every(e => e.effectiveDate === '2026-10-13'));
   assert.ok(events.every(e => e.recordedAt === '2026-10-14T05:30:00.000Z'), 'recorded timestamps stay UTC instants');
 });
+
+// Activity history written by older versions or imported from an export: `at` is whatever parseBackup accepted
+// (a valid date prefix that Date.parse can read), `date` is an optional explicit civil date.
+const quoteWith = history => ({ ...D.demoData()[0], estimate_id: 'HIST-1', history, saved_draft: '' });
+const HISTORY_DAYS = [
+  [{ at: '2030-07-10T12:00:00' }, '2030-07-10', 'zone-less timestamp: the written date, no zone invented'],
+  [{ at: '2030-07-08T23:59:59.999' }, '2030-07-08', 'zone-less with milliseconds, late evening: not shifted'],
+  [{ at: '2030-07-07T00:00:00' }, '2030-07-07', 'zone-less midnight: not shifted'],
+  [{ at: '2030-07-07 08:30:00' }, '2030-07-07', 'space-separated, zone-less'],
+  [{ at: '2030-07-09' }, '2030-07-09', 'date-only'],
+  [{ at: '2030-07-10T12:00:00 GMT' }, '2030-07-10', 'a non-ISO zone suffix is not interpreted'],
+  [{ at: '2030-07-10Tbad+05:30' }, '2030-07-10', 'an unreadable time part falls back to the written date'],
+  [{ at: '2030-07-12T05:30:00.000Z' }, '2030-07-11', 'UTC instant, Oregon evening'],
+  [{ at: '2030-07-12T09:00:00+05:30' }, '2030-07-11', 'offset instant'],
+  [{ at: '2030-07-12T09:00:00-07:00' }, '2030-07-12', 'offset instant already on the Oregon day'],
+  [{ at: '2030-12-15T07:59:59.999Z' }, '2030-12-14', 'one millisecond before Pacific midnight (PST)'],
+  [{ at: '2030-12-15T08:00:00.000Z' }, '2030-12-15', 'Pacific midnight (PST)'],
+  [{ at: '2030-07-12T05:30:00.000Z', date: '2030-07-12' }, '2030-07-12', 'an explicit civil date always wins'],
+  [{ at: 'unreadable', date: '2030-07-12' }, '2030-07-12', 'explicit civil date does not depend on `at`'],
+];
+test('activity history days: written date for zone-less values, Oregon day for instants, never an exception', () => {
+  for (const [entry, day, label] of HISTORY_DAYS) assert.equal(D.historyDay(entry), day, label);
+  // Unusable entries render a blank date instead of throwing, so one bad record can never blank the whole screen.
+  for (const bad of [{}, { at: '' }, { at: 'garbage' }, { at: 12345 }, { at: '2030-02-30T10:00:00Z' }, { date: '2030-02-30', at: '2030-02-30' }, null, undefined, 'text'])
+    assert.equal(D.historyDay(bad), '', JSON.stringify(bad));
+});
+
+test('every history value the importer accepts has a day, and unsupported values are still refused', () => {
+  // Three table rows document fallback behaviour for values the importer itself refuses; they are not part of an accepted export.
+  const accepted = HISTORY_DAYS.filter(([entry]) => !['unreadable', '2030-07-10Tbad+05:30', '2030-07-10T12:00:00 GMT'].includes(entry.at)).map(([entry]) => ({ type: 'update', text: 'Fictional entry', ...entry }));
+  const restored = D.parseBackup(JSON.stringify({ version: 1, quotes: [quoteWith(accepted)] }));
+  assert.deepEqual(restored[0].history, accepted, 'accepted history is kept exactly: nothing dropped or rewritten');
+  for (const entry of restored[0].history) assert.ok(D.validDate(D.historyDay(entry)), JSON.stringify(entry));
+  for (const at of ['', 'garbage', '12:00:00', '2030-13-01T00:00:00Z', '2030-02-30', '2030-07-10Tbad', 5, null])
+    assert.throws(() => D.parseBackup(JSON.stringify({ version: 1, quotes: [quoteWith([{ type: 'update', text: 'x', at }])] })), /invalid activity history/, 'at: ' + JSON.stringify(at));
+  assert.throws(() => D.parseBackup(JSON.stringify({ version: 1, quotes: [quoteWith([{ type: 'update', text: 'x', at: '2030-07-10', date: '2030-02-30' }])] })), /invalid activity history/);
+});

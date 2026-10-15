@@ -4,7 +4,7 @@
 // Row helpers take `quotes` only for opt-out checks, so callers may pass D.optOutBlocks(quotes).
 // Bar and segment sizes are emitted as data attributes and applied with applySizes(), because the
 // Content-Security-Policy does not allow inline style attributes.
-import { daysBetween, followupState, optOutSources, eligible, CHANNELS, CONTACT_RESULTS, TRADES, addDays, businessDateOf, todayISO } from '/domain.js';
+import { daysBetween, followupState, optOutSources, eligible, CHANNELS, CONTACT_RESULTS, TRADES, addDays, historyDay, todayISO } from '/domain.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const usd0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -137,7 +137,7 @@ export function ageChart(buckets) {
 const HISTORY_ICON = { created: 'file', contact: 'Phone', outcome: 'checkCircle', optout: 'pause', import: 'import', update: 'pen', schedule: 'calendar', correction: 'reset' };
 const historyTone = h => h.type === 'outcome' ? (/\bwon\b/.test(h.text) ? 'won' : /\blost\b/.test(h.text) ? 'lost' : 'outcome') : h.type;
 const historyIcon = h => h.type === 'contact' ? (CHANNELS.find(c => h.text.startsWith(c + ' ')) || 'Phone') : HISTORY_ICON[h.type] || (/opted out/i.test(h.text) ? 'pause' : 'pen');
-const historyDate = h => h.date || businessDateOf(h.at);
+const historyDate = historyDay; // never throws; see the policy in domain.js
 export function activityItem(a, today) {
   return `<li class="qt-act qt-act--${historyTone(a)}"><span class="qt-act__icon">${icon(historyIcon(a))}</span><div class="qt-act__body"><p><button class="qt-link" type="button" data-open="${esc(a.estimateId)}">${esc(a.name)}</button> <span>${esc(a.text)}</span></p><time datetime="${esc(historyDate(a))}">${esc(ago(historyDate(a), today))}</time></div></li>`;
 }

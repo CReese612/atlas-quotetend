@@ -12,7 +12,8 @@
     "test:browser": "node tests/browser-rehearsal.mjs",
     "test:public:browser": "node tests/public-site-browser.mjs",
     "test:security:browser": "node tests/security-xss-browser.mjs",
-    "test:calendar:browser": "node tests/business-calendar-browser.mjs"
+    "test:calendar:browser": "node tests/business-calendar-browser.mjs",
+    "test:restore:browser": "node tests/restore-history-browser.mjs"
   },
   "engines": {
     "node": ">=24.0.0"

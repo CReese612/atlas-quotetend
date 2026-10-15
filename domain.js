@@ -33,6 +33,22 @@ export function businessDateOf(value, zone = BUSINESS_TIME_ZONE) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 export const todayISO = () => businessDateOf(Date.now());
+// The calendar day shown for one activity-history entry. History is stored exactly as it was written and may predate the
+// business calendar: parseBackup accepts any `at` that begins with a valid date and that Date.parse can read, so values
+// without a zone ("2030-07-10T12:00:00", "2030-07-10 08:30") exist in saved data and in exports. Policy:
+//  1. an explicit civil `date` on the entry always wins;
+//  2. an ISO timestamp that carries an offset (Z, +05:30) is a real instant and shows its Oregon business day;
+//  3. anything else (zone-less or date-only) shows the date as written. No zone is invented and nothing is rewritten.
+// It never throws: an unusable entry yields '' (shown as a blank date) rather than blanking the whole screen.
+export function historyDay(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  if (typeof entry.date === 'string' && validDate(entry.date)) return entry.date;
+  const at = typeof entry.at === 'string' ? entry.at : '';
+  if (at.length > 10 && validDate(at.slice(0, 10)) && /^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:?\d{2})$/i.test(at)) {
+    try { return businessDateOf(at); } catch { /* unreadable instant: fall back to the written date */ }
+  }
+  return validDate(at.slice(0, 10)) ? at.slice(0, 10) : '';
+}
 export function addDays(date, days) { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); }
 export function validDate(value) { if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false; const d = new Date(`${value}T12:00:00Z`); return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === value; }
 export const emailKey = email => String(email || '').trim().toLowerCase();
