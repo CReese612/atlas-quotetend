@@ -12,6 +12,7 @@ import { connect, createServer as createTcpServer } from 'node:net';
 import { request } from 'node:http';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
@@ -54,26 +55,30 @@ async function assertReleased(before, label) {
 }
 
 // --- HTTP over a raw socket, so a test decides exactly which bytes of a request are sent and when. -------------------
-function parseResponse(buffer) {
-  let rest = buffer;
-  for (;;) {
-    const end = rest.indexOf('\r\n\r\n'); if (end < 0) return null;
+// Every complete final response in the bytes received so far, in order (pipelined responses share one connection).
+function parseResponses(buffer) {
+  const found = [];
+  for (let rest = buffer; ;) {
+    const end = rest.indexOf('\r\n\r\n'); if (end < 0) return found;
     const [statusLine, ...lines] = rest.subarray(0, end).toString('latin1').split('\r\n');
     const status = Number(statusLine.split(' ')[1]);
     rest = rest.subarray(end + 4);
     if (status >= 100 && status < 200) continue; // an interim "100 Continue"
     const headers = Object.fromEntries(lines.map(line => [line.slice(0, line.indexOf(':')).toLowerCase(), line.slice(line.indexOf(':') + 1).trim()]));
     const length = Number(headers['content-length'] || 0);
-    if (rest.length < length) return null;
-    return { status, headers, text: rest.subarray(0, length).toString('utf8') };
+    if (rest.length < length) return found;
+    found.push({ status, headers, text: rest.subarray(0, length).toString('utf8') });
+    rest = rest.subarray(length);
   }
 }
+const parseResponse = buffer => parseResponses(buffer)[0] ?? null;
 function waitOn(socket, read, parse) {
   return new Promise((resolve, reject) => {
     const check = () => { const value = parse(read()); if (value) { stop(); resolve(value); } };
     const closed = () => { stop(); const value = parse(read()); if (value) resolve(value); else reject(new Error('Connection closed before the expected bytes arrived.')); };
     const stop = () => { socket.off('data', check); socket.off('close', closed); };
     socket.on('data', check); socket.on('close', closed); check();
+    if (socket.destroyed) closed(); // already closed: no further 'data' or 'close' will come
   });
 }
 async function rawConnection(port, accepted = Promise.resolve()) {
@@ -83,7 +88,8 @@ async function rawConnection(port, accepted = Promise.resolve()) {
   const closed = new Promise(resolve => socket.once('close', resolve));
   await Promise.all([once(socket, 'connect'), accepted]);
   const read = () => Buffer.concat(chunks);
-  return { socket, closed, response: () => waitOn(socket, read, parseResponse),
+  return { socket, closed, received: () => read().toString('latin1'), response: () => waitOn(socket, read, parseResponse),
+    responses: count => waitOn(socket, read, buffer => { const all = parseResponses(buffer); return all.length >= count ? all : null; }),
     continued: () => waitOn(socket, read, buffer => buffer.toString('latin1').startsWith('HTTP/1.1 100 Continue\r\n\r\n')) };
 }
 function send(env, path, { method = 'GET', body, cookie } = {}) {
@@ -111,10 +117,13 @@ const commandHead = (env, businessId, cookie, length, extra = '') =>
 
 // --- In-process server --------------------------------------------------------------------------------------------
 async function launch(t, options = {}) {
-  const defer = cleanupFor(t), dir = tempDir(defer), logs = [], clients = [], dbPath = join(dir, 'accounts.sqlite');
-  const running = await startServer({ port: 0, dbPath, config: { ...configuration({}), backupDir: join(dir, 'backups') }, logger: entry => logs.push(entry), ...options });
-  const env = { dir, dbPath, logs, running, port: running.port, host: '127.0.0.1:' + running.port, closing: null,
+  const defer = cleanupFor(t), dir = tempDir(defer), logs = [], clients = [], dbPath = join(dir, 'accounts.sqlite'), waiters = new Set();
+  const logger = entry => { logs.push(entry); for (const check of waiters) check(); };
+  const running = await startServer({ port: 0, dbPath, config: { ...configuration({}), backupDir: join(dir, 'backups') }, logger, ...options });
+  const env = { dir, dbPath, logs, logger, running, defer, port: running.port, host: '127.0.0.1:' + running.port, closing: null,
     close: () => env.closing ??= running.close(),
+    // Resolves when the server logs `event` (or already has).
+    logged: event => within(new Promise(resolve => { const check = () => { const found = logs.find(e => e.event === event); if (found) { waiters.delete(check); resolve(found); } }; waiters.add(check); check(); }), BOUND, `log ${event}`),
     // Resolves once the server has accepted the socket, so shutdown never starts while it is still in the kernel backlog.
     connect: async () => { const c = await rawConnection(running.port, once(running.server, 'connection')); clients.push(c.socket); return c; } };
   defer(async () => {
@@ -397,4 +406,209 @@ test('F/G/I/J: the real process drains on SIGTERM, ignores a repeated signal, re
     assert.equal(backups.length, 2, 'one verified startup backup per start');
     for (const file of backups) assert.equal(verifyBackup(join(dir, 'backups', file)).version, 3);
   });
+});
+
+// --- Sprint 3B.1a: Codex audit findings P1-001, P2-001, P2-002 ----------------------------------------------------
+const registration = (env, n) => {
+  const body = JSON.stringify({ email: `pipeline-${n}@example.com`, password: PASSWORD, businessName: `Fictional Pipeline ${n}` });
+  return `POST /api/register HTTP/1.1\r\nHost: ${env.host}\r\nOrigin: http://${env.host}\r\nX-QuoteTend-Request: 1\r\n` +
+    `Content-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\nConnection: keep-alive\r\n\r\n${body}`;
+};
+const ownersIn = dbPath => {
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try { return { owners: db.prepare('SELECT COUNT(*) n FROM owners').get().n, integrity: db.prepare('PRAGMA integrity_check').get().integrity_check }; }
+  finally { db.close(); }
+};
+// Event-loop turns, not clock time. until() gives up after `limit` turns so a missing event fails instead of hanging.
+const turns = async count => { for (let turn = 0; turn < count; turn++) await new Promise(setImmediate); };
+const until = async (predicate, what, limit = 100_000) => {
+  for (let turn = 0; !predicate(); turn++) { if (turn === limit) throw new Error(`${what} did not happen within ${limit} event-loop turns`); await new Promise(setImmediate); }
+};
+function captureUnhandled(t) {
+  const seen = [], listener = reason => seen.push(String(reason?.message ?? reason));
+  process.on('unhandledRejection', listener); t.after(() => process.off('unhandledRejection', listener));
+  return seen;
+}
+// Holds the nth bcrypt.hash call (registration hashes the password) until release(), so a request is provably still
+// running at a chosen moment. bcryptjs is one shared module instance, so the server's handler sees this mock. Install
+// it after launch(): startup itself hashes once. The gate is released before the server is closed during cleanup.
+function holdHash(t, env, nth) {
+  const original = bcrypt.hash; let calls = 0, release, entered;
+  const gate = new Promise(resolve => { release = resolve; }), started = new Promise(resolve => { entered = resolve; });
+  t.mock.method(bcrypt, 'hash', (...args) => ++calls === nth ? (entered(), gate.then(() => original(...args))) : original(...args));
+  env.defer(() => release());
+  return { started, release };
+}
+// Holds mkdir, the first step of every backup, until release(). backups.mjs imports mkdir from node:fs/promises;
+// syncBuiltinESMExports() points that live binding at the mock, and back at the original afterwards.
+function holdBackup(t, env) {
+  const fsp = createRequire(import.meta.url)('node:fs/promises'), original = fsp.mkdir; let release, entered;
+  const gate = new Promise(resolve => { release = resolve; }), started = new Promise(resolve => { entered = resolve; });
+  const mocked = t.mock.method(fsp, 'mkdir', async (...args) => { entered(); await gate; return original(...args); });
+  syncBuiltinESMExports();
+  env.defer(() => { release(); mocked.mock.restore(); syncBuiltinESMExports(); });
+  return { started, release };
+}
+const shutdownEvents = logs => logs.filter(e => e.event.startsWith('shutdown_')).map(e => e.event);
+
+test('P1-001 natural: two requests pipelined on one connection before shutdown both get their responses', { timeout: 30_000 }, async t => {
+  const env = await launch(t, { shutdownGraceMs: 60_000 }), unhandled = captureUnhandled(t);
+  const c = await env.connect();
+  let accepted = 0, both; const bothAccepted = new Promise(resolve => { both = resolve; });
+  env.running.server.on('request', () => { if (++accepted === 2) both(); });
+  c.socket.write(registration(env, 1) + registration(env, 2));
+  await within(bothAccepted, BOUND, 'both requests accepted');
+  const result = await within(env.close(), BOUND, 'close()');
+  const [first, second] = await within(c.responses(2), BOUND, 'both responses');
+  assert.deepEqual([first.status, second.status], [201, 201]);
+  assert.equal(first.headers.connection, 'keep-alive', 'the first response keeps the connection open for the second');
+  assert.equal(second.headers.connection, 'close');
+  assert.equal(result?.forced, false); assert.equal(result?.unfinished, 0);
+  assert.deepEqual(ownersIn(env.dbPath), { owners: 2, integrity: 'ok' });
+  assert.deepEqual(unhandled, []);
+});
+
+test('P1-001 controlled: a held second pipelined request keeps shutdown open and SQLite usable until it finishes', { timeout: 30_000 }, async t => {
+  const env = await launch(t, { shutdownGraceMs: 60_000 }), unhandled = captureUnhandled(t), held = holdHash(t, env, 2);
+  const c = await env.connect();
+  c.socket.write(registration(env, 1) + registration(env, 2));
+  await within(held.started, BOUND, 'second registration hashing'); // both requests accepted; the second is held
+  let settled = false; const closing = env.close().then(result => { settled = true; return result; });
+  assert.equal(env.running.close(), env.closing, 'a repeated close() returns the same shutdown');
+  const [first] = await within(c.responses(1), BOUND, 'first response');
+  assert.equal(first.status, 201); assert.equal(first.headers.connection, 'keep-alive');
+  await turns(2);
+  assert.equal(settled, false, 'shutdown waits for the held request');
+  assert.equal(env.running.store.db.isOpen, true, 'SQLite stays open while accepted work runs');
+  assert.equal(c.socket.destroyed, false, 'the connection stays open for the second response');
+  held.release();
+  const [, second] = await within(c.responses(2), BOUND, 'second response');
+  assert.equal(second.status, 201); assert.equal(second.headers.connection, 'close');
+  const result = await within(closing, BOUND, 'close()');
+  assert.equal(result.forced, false); assert.equal(result.unfinished, 0);
+  assert.deepEqual(ownersIn(env.dbPath), { owners: 2, integrity: 'ok' });
+  assert.deepEqual(unhandled, []);
+});
+
+test('P1-001 control: concurrent requests on separate connections both finish before shutdown completes', { timeout: 30_000 }, async t => {
+  const env = await launch(t, { shutdownGraceMs: 60_000 }), unhandled = captureUnhandled(t), held = holdHash(t, env, 1);
+  const a = await env.connect(), b = await env.connect();
+  a.socket.write(registration(env, 1));
+  await within(held.started, BOUND, 'first registration hashing'); // a is held
+  const bAccepted = once(env.running.server, 'request');
+  b.socket.write(registration(env, 2));
+  await within(bAccepted, BOUND, 'second registration accepted');
+  let settled = false; const closing = env.close().then(result => { settled = true; return result; });
+  const fromB = await within(b.response(), BOUND, 'response on the second connection');
+  assert.equal(fromB.status, 201); assert.equal(fromB.headers.connection, 'close');
+  await within(b.closed, BOUND, 'second connection closing');
+  await turns(2);
+  assert.equal(settled, false); assert.equal(env.running.store.db.isOpen, true); assert.equal(a.socket.destroyed, false);
+  held.release();
+  const fromA = await within(a.response(), BOUND, 'response on the first connection');
+  assert.equal(fromA.status, 201); assert.equal(fromA.headers.connection, 'close');
+  const result = await within(closing, BOUND, 'close()');
+  assert.equal(result.forced, false); assert.equal(result.unfinished, 0);
+  assert.deepEqual(ownersIn(env.dbPath), { owners: 2, integrity: 'ok' });
+  assert.deepEqual(unhandled, []);
+});
+
+test('P1-001: an accepted request whose client disconnects is still waited for, with SQLite open until it finishes', { timeout: 30_000 }, async t => {
+  const env = await launch(t, { shutdownGraceMs: 60_000 }), unhandled = captureUnhandled(t), held = holdHash(t, env, 1);
+  const c = await env.connect();
+  c.socket.write(registration(env, 1));
+  await within(held.started, BOUND, 'registration hashing');
+  c.socket.destroy(); await c.closed;
+  const transportClosed = once(env.running.server, 'close');
+  let settled = false; const closing = env.close().then(result => { settled = true; return result; });
+  await within(transportClosed, BOUND, 'every connection closed'); // the HTTP side is finished; the handler is not
+  await turns(2);
+  assert.equal(settled, false, 'a closed connection is not finished work');
+  assert.equal(env.running.store.db.isOpen, true);
+  held.release();
+  const result = await within(closing, BOUND, 'close()');
+  assert.equal(result.forced, false); assert.equal(result.unfinished, 0);
+  assert.deepEqual(ownersIn(env.dbPath), { owners: 1, integrity: 'ok' }, 'the request finished its work');
+  assert.deepEqual(unhandled, []);
+});
+
+test('P1-001/D: at the deadline unfinished work is reported, gets no fabricated response and cannot write afterwards', { timeout: 30_000 }, async t => {
+  const env = await launch(t, { shutdownGraceMs: 200 }), unhandled = captureUnhandled(t), held = holdHash(t, env, 1);
+  const createOwner = t.mock.method(env.running.store, 'createOwner');
+  const c = await env.connect();
+  c.socket.write(registration(env, 1));
+  await within(held.started, BOUND, 'registration hashing');
+  const result = await within(env.close(), BOUND, 'close()');
+  assert.equal(result?.forced, true); assert.equal(result?.unfinished, 1);
+  assert.equal(env.logs.find(e => e.event === 'shutdown_deadline')?.unfinished, 1);
+  const complete = env.logs.find(e => e.event === 'shutdown_complete');
+  assert.equal(complete.forced, true); assert.equal(complete.unfinished, 1);
+  assert.equal(env.running.store.db.isOpen, false);
+  await within(c.closed, BOUND, 'connection closed');
+  assert.doesNotMatch(c.received(), /HTTP\/1\.1/, 'no response is sent for work that did not finish');
+  // Destroying the connection does not stop the handler. It resumes after SQLite closed, and its first database call
+  // fails before any statement runs, so nothing is written.
+  held.release();
+  await until(() => createOwner.mock.callCount() > 0, 'the late handler reaching the database');
+  assert.match(String(createOwner.mock.calls[0].error?.message), /not open/i);
+  await turns(3);
+  assert.deepEqual(ownersIn(env.dbPath), { owners: 0, integrity: 'ok' });
+  assert.deepEqual(unhandled, []);
+  assert.doesNotMatch(JSON.stringify(env.logs), /pipeline-1@example\.com|Fictional-shutdown-password|Fictional Pipeline/);
+});
+
+test('P2-002: a startup failure after the database opens and the first backup runs releases both and keeps the error', { timeout: 30_000 }, async t => {
+  const defer = cleanupFor(t), dir = tempDir(defer), dbPath = join(dir, 'accounts.sqlite');
+  const intervals = t.mock.method(globalThis, 'setInterval'), cleared = t.mock.method(globalThis, 'clearInterval');
+  t.mock.method(bcrypt, 'hash', async () => { throw new Error('fictional initialization failure'); }); // accountAPI() setup hashes
+  const before = handles();
+  await assert.rejects(startServer({ port: 0, dbPath, config: { ...configuration({}), backupDir: join(dir, 'backups') }, logger: () => {} }),
+    { message: 'fictional initialization failure' });
+  const schedule = intervals.mock.calls.find(call => call.arguments[1] === 6 * 60 * 60 * 1000);
+  assert.ok(schedule, 'the backup schedule had been created');
+  assert.ok(cleared.mock.calls.some(call => call.arguments[0] === schedule.result), 'the backup schedule was stopped');
+  await assertReleased(before, 'failed initialization');
+  assert.equal(readdirSync(join(dir, 'backups')).filter(f => f.endsWith('.sqlite')).length, 1, 'the verified startup backup exists');
+  const reopened = openAccounts(dbPath);
+  try { assert.equal(reopened.db.prepare('PRAGMA integrity_check').get().integrity_check, 'ok'); } finally { reopened.close(); }
+  // Windows cannot delete an open SQLite file, so there this also proves the failed server released it.
+  assert.doesNotThrow(() => rmSync(dbPath));
+});
+
+test('P2-001 contract: direct close() waits for a running backup, never closes SQLite under it, and logs why', { timeout: 30_000 }, async t => {
+  const env = await launch(t, { shutdownGraceMs: 60_000 }), held = holdBackup(t, env);
+  let backupDone = false; const backup = env.running.backups.run().then(path => { backupDone = true; return path; });
+  await within(held.started, BOUND, 'backup started');
+  let settled = false; const closing = env.close().then(result => { settled = true; return result; });
+  await env.logged('shutdown_waiting_for_backup');
+  await turns(2);
+  assert.equal(settled, false); assert.equal(env.running.server.listening, false);
+  assert.equal(env.running.store.db.isOpen, true, 'SQLite is never closed under a running backup');
+  held.release();
+  const result = await within(closing, BOUND, 'close() after the backup');
+  assert.equal(backupDone, true); assert.equal(result.forced, false); assert.equal(env.running.store.db.isOpen, false);
+  assert.equal(verifyBackup(await backup).version, 3);
+  assert.deepEqual(readdirSync(join(env.dir, 'backups')).filter(f => f.endsWith('.partial')), []);
+  assert.deepEqual(shutdownEvents(env.logs), ['shutdown_started', 'shutdown_waiting_for_backup', 'shutdown_complete']);
+});
+
+test('P2-001 contract: behind a stalled backup the signal watchdog exits 1 without claiming completion', { timeout: 30_000 }, async t => {
+  const env = await launch(t, { shutdownGraceMs: 60_000 }), held = holdBackup(t, env);
+  const backup = env.running.backups.run();
+  await within(held.started, BOUND, 'backup started');
+  const proc = new EventEmitter(), exits = [];
+  t.mock.timers.enable({ apis: ['setTimeout'] }); // the watchdog's 15 s, without waiting 15 s
+  serverModule.handleShutdownSignals(env.running, { proc, logger: env.logger, exit: code => exits.push(code), watchdogMs: 15_000 });
+  proc.emit('SIGTERM', 'SIGTERM'); proc.emit('SIGINT', 'SIGINT');
+  await until(() => env.logs.some(e => e.event === 'shutdown_waiting_for_backup'), 'shutdown_waiting_for_backup');
+  t.mock.timers.tick(14_999); assert.deepEqual(exits, []);
+  t.mock.timers.tick(1); assert.deepEqual(exits, [1]);
+  t.mock.timers.reset();
+  assert.deepEqual(shutdownEvents(env.logs),
+    ['shutdown_signal', 'shutdown_started', 'shutdown_signal_repeated', 'shutdown_waiting_for_backup', 'shutdown_watchdog_expired', 'shutdown_exit']);
+  assert.equal(env.logs.find(e => e.event === 'shutdown_exit').code, 1);
+  assert.equal(env.running.store.db.isOpen, true, 'the watchdog neither closes SQLite nor claims it was closed');
+  held.release(); await backup;
+  assert.equal((await within(env.close(), BOUND, 'close() after the backup')).forced, false);
+  assert.deepEqual(exits, [1], 'no second exit');
 });
