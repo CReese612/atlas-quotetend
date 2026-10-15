@@ -14,7 +14,8 @@ operational (audit log, per-account throttling, off-host backups, hosted verific
 > issues, both now fixed on this branch: a residual 500 from a coercion-hostile stored `session.started` (D8) and
 > incorrect Pacific business-date behaviour (the timezone issue first documented in section 6). Section 11 has the
 > details, tests and results. **This branch is a review candidate, not production-ready**; the remaining gates are in
-> sections 8, 9 and 11.
+> sections 8, 9 and 11. **Sprint 3A.2** then fixed two further Codex re-audit findings (an accepted restore that left the app
+> unable to render, and a calendar browser fixture that aged into a sign-in failure); see section 12.
 
 ## 1. Architecture and threat model
 
@@ -285,10 +286,11 @@ Failing before the fixes: session test 1 (500); calendar unit file 7 of 8; calen
 morning on which all zones agree, is a sanity scenario). The previously failing Pacific Results test now passes in every
 zone with no dependence on the current clock.
 
-Test technique notes: Node on Windows ignores `TZ=<IANA name>` set in the shell (only `UTC` and POSIX names work), so
-`tests/helpers/set-timezone.mjs` assigns `process.env.TZ` at start-up from `QUOTETEND_TEST_TZ`; browser zone comes from
-`QUOTETEND_BROWSER_TZ` (Playwright `timezoneId`). Frozen instants in the browser test are in the real future because Chromium
-expires cookies against the real clock.
+Test technique notes: `tests/helpers/set-timezone.mjs` assigns `process.env.TZ` at start-up from `QUOTETEND_TEST_TZ`, which works
+identically in every shell; browser zone comes from `QUOTETEND_BROWSER_TZ` (Playwright `timezoneId`). *Correction (3A.2):* this
+section originally said Windows ignores shell `TZ=<IANA name>`. Independent QA could not reproduce that and re-measurement
+showed it is specific to **Git Bash** (which left the machine zone in place); PowerShell, cmd, macOS and Linux honour a shell
+`TZ`. *Superseded (3A.2):* the browser calendar test's fixed "real future" instants were themselves a latent defect; see section 12.
 
 ### Results (this machine, Node v24.19.0, Edge via Playwright)
 
@@ -319,17 +321,105 @@ and Codex re-audit of this branch.
 | `425e4b33b242a0985ba21933aa7095cb7b118f94` | test(dates): add frozen-clock browser calendar test and zone controls |
 | *(this documentation commit)* | docs(security): record Sprint 3A.1 QA remediation — the branch head is the new candidate; its SHA is in the handoff |
 
+## 12. Sprint 3A.2 — Restore rendering and browser-test reliability
+
+Independent Codex re-audit of `98e19b3` accepted D8 and D1–D7 and the core Pacific day calculation, and returned **NO-GO
+for merge, staging and production** on two new findings. This section records both, the fixes and the evidence. PR #2
+remains an unmerged draft; this is still not production-ready.
+
+### R1 — an accepted restore could leave the app unable to render (P1) — fixed in `1ff2479`
+
+* **Reproduction (my own, in a real browser through the Settings restore dialog, synthetic data):** restore an export whose
+  history entries include `at: "2030-07-10T12:00:00"` (no zone). The restore returns success; after it, the overview and the
+  estimate details never render ("Loading your workspace…") and the page logs
+  `Expected a valid instant (Date, epoch milliseconds or an ISO timestamp with an offset) or a YYYY-MM-DD date.` — the same
+  error Codex recorded. Follow-ups, Results and Settings still rendered because they do not draw history.
+* **Cause (confirmed, and the only one found):** `parseBackup` accepts any history `at` that starts with a valid date and that
+  `Date.parse` can read, including zone-less, date-only and space-separated values. Sprint 3A.1 changed `historyDate` in
+  `app/ui.js` to `businessDateOf(h.at)`, which correctly refuses zone-less strings, so rendering threw while validation said
+  yes. Sprint 3A.1 assumed every history `at` was an offset-bearing instant; that assumption was wrong. A scan of every other consumer of history
+  `at` found only `app/views.js` (recent-activity sort by raw string; cannot throw and unchanged behaviour).
+* **Policy (one function, `historyDay` in `domain.js`, never throws):** (1) an explicit civil `date` on the entry wins;
+  (2) an ISO timestamp that carries an offset is a real instant and shows its **Oregon business day**; (3) anything else —
+  zone-less, date-only, space-separated — shows **the date as written**. No zone is invented, nothing is rewritten, dropped or
+  assigned a UTC meaning; an unusable entry yields a blank date instead of blanking the screen. Validation, storage, API
+  and schema 3 are unchanged, and the importer still refuses unsupported values (`garbage`, `12:00:00`, impossible dates, a
+  non-string `at`, an invalid explicit `date`).
+* **Before the fix:** `restore-history-browser.mjs` failed 3 of 8 steps (overview, estimate details with history, sign-out and
+  sign-in again), each with the page error above; both new unit tests failed.
+* **Tests added:** `tests/restore-history-browser.mjs` (8 steps) — pre-restore workspace; restore through the real dialog of an
+  accepted export (zone-less, date-only, space-separated, UTC, offset and explicit-date history; an opted-out customer; a
+  saved draft); overview after reload; estimate details with each entry's documented date; follow-ups; Results; Settings and the
+  safety-copy list (holds exactly the pre-restore workspace); reload, sign out and sign in again; and stored records, history
+  byte-for-byte, notes, draft, retained opt-out, `workspace_restored` actor, new epoch and no logged server fault. Two unit tests
+  in `business-calendar.test.mjs` (13 policy cases incl. DST-adjacent instants; every value the importer accepts has a day,
+  accepted history is kept unchanged, unsupported values still refused) run in all four zones via the matrix. Note: the
+  Settings **estimate** export (`Export JSON`) and CSV paths were not changed.
+
+### R2 — frozen calendar browser suite aged into an authentication failure (P2) — fixed in `4bd69c7`
+
+* **Reproduction (October 15, 2026, real clock `2026-10-15T05:51Z`):** `npm run test:calendar:browser` → scenario 1 fixed at
+  `2026-10-14T05:30:00Z` never leaves `/signin`; 2 pass / 1 fail, exit 1. The server stamps the session cookie
+  "frozen instant + 8 h" = `2026-10-14T13:30Z`, already past on Chromium's real clock, so the browser discards it. Not a
+  product login failure; the application's Pacific maths is unaffected.
+* **Fix:** the browser scenarios are derived from the moment the test runs (`tests/helpers/future-scenarios.mjs`): the nearest
+  upcoming occurrence, at least 36 h ahead, of (1) Oregon 22:30 while Chicago and UTC are already tomorrow, (2) one second
+  before Pacific midnight (PST), (3) the spring-forward 03:00 PDT morning, (4) the fall-back repeated 01:30 hour (new; nothing
+  skipped or weakened). The expected Oregon day comes from an **independent oracle** — the published US daylight-saving rules
+  with fixed offsets and plain arithmetic, no `Intl`, no application code. Historical fixed boundary instants remain in the unit
+  suite, where no browser cookie is involved. Cookie security is untouched: after sign-in the test asserts a real, unexpired,
+  HttpOnly, SameSite=Strict session cookie and a 200 from the protected API.
+* **Safeguards:** an up-front `FIXTURE CLOCK ERROR` if any frozen instant would give an expired cookie; and if sign-in fails and
+  the browser kept no session cookie, the failure is labelled a fixture problem (demonstrated with the stale October 14 instant
+  in a throwaway copy). `tests/browser-fixture-clock.test.mjs` (3 unit tests) simulates the suite being run on every 6th hour
+  from 2026-10-15 through 2032 and checks that every scenario stays in the future, still shows its named condition
+  (Chicago and UTC a day ahead; second Sunday of March; first Sunday of November), matches an `Intl` cross-check, and that the
+  old instant is reported as a fixture error — so a decaying fixture now fails in the fast unit suite, not mysteriously in a browser.
+
+### Results (Node v24.19.0, Edge/Chromium via Playwright; US Central machine; zones set per process and per browser)
+
+| Run | Result |
+| --- | --- |
+| `npm test` (default env) | **154 / 154 pass**, 0 fail, 0 skipped, exit 0, ~15 s, exits by itself |
+| Unit suite, process zone forced to Los Angeles, Chicago, UTC, Kiritimati (PowerShell) | **155 / 155 pass in each** (154 + zone self-check), 0 skipped / cancelled |
+| `npm run test:browser` default | 24 / 24 groups |
+| Private browser, server = browser zone in each of the four zones | 24 / 24 in each |
+| Private browser, mixed server / browser: Chicago / Los Angeles; Los Angeles / Kiritimati; UTC / Chicago; Kiritimati / UTC | 24 / 24 in each |
+| `npm run test:restore:browser` default, then the same eight zone pairs | **8 / 8 checks** in each of the nine runs |
+| `npm run test:security:browser` default and in each of the four zones | all checks pass |
+| `npm run test:public:browser` default and in each of the four zones | 27 / 27 in each |
+| `npm run test:calendar:browser` (default, derived scenarios) | **4 / 4** (was 2 / 3, exit 1) |
+| D1–D8 security regressions (`tests/security-*.test.mjs`, inside `npm test`) | 39 / 39 |
+
+Every command exited by itself with exit code 0; nothing was skipped and no group was unreached.
+
+### Remaining gates (unchanged, not authorized here)
+
+Authentication/security audit trail, per-account throttling, encrypted off-service backups with a restore drill, bounded
+graceful shutdown (`server.close()` still waits on idle sockets), hosted proxy/cookie/HSTS verification and Render/Blueprint
+review, plus aligning the inert `TZ=America/Chicago` hosting entry. Open P2: the dashboard's recent-activity list orders by
+raw `at` strings, so entries mixing zone-less and `Z` timestamps can be ordered approximately (display only).
+
+### Sprint 3A.2 commits
+
+| Commit | Summary |
+| --- | --- |
+| `1ff2479e201243355064f7b0c5d2ba192174276e` | fix(history): render restored legacy activity safely |
+| `4bd69c72ec6f5f13e93bf8e8fbde6751b32021db` | test(calendar): prevent frozen cookie expiry failures |
+| *(this documentation commit)* | docs(security): record Sprint 3A.2 restore and browser-test remediation — the branch head is the candidate; its SHA is in the handoff |
+
 ## Reproducing this branch
 
 ```bash
 git fetch origin
 git switch security/tenant-isolation-hardening
-npm test                         # node:test, 149 tests; includes the four-zone calendar matrix
+npm test                         # node:test, 154 tests (155 with a forced zone); includes the four-zone calendar matrix
 npm run test:browser             # private app, 24 groups (needs Edge/Chromium; QUOTETEND_BROWSER_PATH for another build)
 npm run test:security:browser
 npm run test:public:browser
-npm run test:calendar:browser
-# Any suite under another machine zone (TZ in the shell does not accept IANA names for Node on Windows):
+npm run test:calendar:browser    # 4 scenarios derived from the real clock (never ages out)
+npm run test:restore:browser     # accepted legacy export -> restore -> every screen, reload, sign out/in
+# Any suite under another machine zone (works in any shell, including Git Bash, where a shell TZ is not honoured):
 QUOTETEND_TEST_TZ=Pacific/Kiritimati node --import ./tests/helpers/set-timezone.mjs --test tests/*.test.mjs
 QUOTETEND_TEST_TZ=America/Chicago QUOTETEND_BROWSER_TZ=UTC node --import ./tests/helpers/set-timezone.mjs tests/browser-rehearsal.mjs
 # PowerShell: $env:QUOTETEND_TEST_TZ='Pacific/Kiritimati'; node --import ./tests/helpers/set-timezone.mjs --test (Get-ChildItem tests/*.test.mjs)
