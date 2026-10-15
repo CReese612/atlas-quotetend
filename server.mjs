@@ -64,42 +64,74 @@ export async function startServer({ port = Number(process.env.PORT || 4173), dbP
     const status = err.type === 'entity.too.large' ? 413 : err.type === 'entity.parse.failed' || err.status === 400 || err.statusCode === 400 ? 400 : 500;
     res.status(status).json({ error: status === 413 ? 'Workspace exceeds the 5 MB limit.' : status === 400 ? (err.type === 'entity.parse.failed' ? 'Invalid JSON request.' : 'Invalid request.') : 'Unable to complete the request. No success was confirmed. Reload to check saved data.' });
   });
-  // Each socket maps to the responses it still owes. Node's server.close() only drops sockets between completed requests:
-  // one that has not sent a whole request (a browser pre-connection, a stalled client) counts as busy, and close() also
-  // stops the header timeout that would have dropped it, so shutdown could wait forever. See close() below.
-  const server = createServer(app), owed = new Map();
-  let draining = false, shutdown = null;
-  server.on('connection', socket => { owed.set(socket, new Set()); socket.once('close', () => owed.delete(socket)); });
-  server.prependListener('request', (req, res) => {
-    const responses = owed.get(req.socket); responses?.add(res);
-    if (draining) res.setHeader('Connection', 'close');
-    // A keep-alive response already under way when shutdown began leaves its socket idle: drop it now, not after the
-    // keep-alive timeout. A "Connection: close" response has already ended its socket (writable is false).
-    res.once('close', () => { responses?.delete(res); if (draining && !responses?.size && req.socket.writable) req.socket.destroy(); });
+  // Shutdown bookkeeping, kept separately for the transport and for the work (see close() below):
+  // - `connections`: per socket, the accepted responses it still owes in order, and whether one of them has told the
+  //   client "Connection: close". Node's server.close() only drops sockets between completed requests; one that has not
+  //   sent a whole request (a browser pre-connection, a stalled client) counts as busy, and close() also stops the
+  //   header timeout that would have dropped it, so shutdown could wait forever.
+  // - `unfinished`: accepted requests whose handler has not yet ended its response. A closed socket does not stop a
+  //   handler (an awaited bcrypt hash carries on), so a closed connection is not finished work.
+  const connections = new Map(), unfinished = new Set();
+  let draining = false, shutdown = null, onIdle = null;
+  const server = createServer((req, res) => {
+    const conn = connections.get(req.socket);
+    // After a response has said "Connection: close", no later request on that connection may be processed (RFC 9112 §9.6).
+    if (conn?.closing) return;
+    unfinished.add(res); conn?.owed.push(res);
+    const { end, writeHead } = res;
+    // The handler is done once it ends its response, whether or not the client is still connected to receive it.
+    res.end = function (...args) { try { return end.apply(this, args); } finally { unfinished.delete(res); if (!unfinished.size) onIdle?.(); } };
+    // While draining, only the last response a connection owes says "Connection: close". An earlier pipelined response
+    // that said it would end the connection before the later, already accepted, responses were sent.
+    res.writeHead = function (...args) {
+      if (draining && conn && conn.owed.at(-1) === res && !this.headersSent) { this.setHeader('Connection', 'close'); conn.closing = true; }
+      return writeHead.apply(this, args);
+    };
+    // A connection left owing nothing while draining (its last response was sent keep-alive before shutdown began) is
+    // idle: drop it now rather than after the keep-alive timeout.
+    res.once('close', () => {
+      if (!conn) return;
+      const index = conn.owed.indexOf(res); if (index >= 0) conn.owed.splice(index, 1);
+      if (draining && !conn.owed.length && !conn.closing) req.socket.destroy();
+    });
+    app(req, res);
   });
+  server.on('connection', socket => { connections.set(socket, { owed: [], closing: false }); socket.once('close', () => connections.delete(socket)); });
   try { await new Promise((resolve, reject) => { server.on('error', reject); server.listen(port, config.host || '127.0.0.1', resolve); }); }
   catch (err) { await backups.stop();store.close(); throw err; }
-  // One bounded shutdown however often it is requested: stop accepting connections, drop sockets with nothing in flight,
-  // let in-flight requests finish (their connections then close) for up to shutdownGraceMs, then destroy whatever is
-  // left. Only after that, with a running backup finished, is SQLite closed. Resolves to { forced, durationMs }.
+  // One shutdown however often it is requested:
+  // 1. Stop accepting connections and drop every socket that owes no response (no request was accepted on it).
+  // 2. For up to shutdownGraceMs, let accepted requests finish. Each connection closes after the last response it owes.
+  //    The drain is clean only when every connection has closed AND every accepted handler has finished.
+  // 3. At the deadline, destroy the remaining connections (forced). Handlers still running are counted as `unfinished`;
+  //    destroying a socket does not stop them. Every database write is one synchronous transaction, so none is open
+  //    when SQLite closes, and such a handler fails at its first database call afterwards without writing anything.
+  // 4. Wait for a backup that is already running. It is never cut short: Node's SQLite backup cannot be cancelled and
+  //    closing the database under it is unsafe, so this wait has no deadline (the signal watchdog bounds the process).
+  // 5. Close SQLite. Resolves to { forced, unfinished, durationMs }.
   async function drainAndClose() {
     draining = true;
     const started = performance.now(), failures = [];
-    logger({event:'shutdown_started',graceMs:shutdownGraceMs,connections:owed.size});
+    logger({event:'shutdown_started',graceMs:shutdownGraceMs,connections:connections.size,requests:unfinished.size});
     const backupsStopped = backups.stop(); // no new backup starts; one already running finishes before SQLite closes
-    let drained = false, deadline;
-    const httpClosed = new Promise(resolve => server.close(err => { drained = true; if (err) failures.push('http'); resolve(); }));
-    for (const [socket, responses] of owed) {
-      if (!responses.size) socket.destroy();
-      else for (const res of responses) if (!res.headersSent) res.setHeader('Connection', 'close');
-    }
-    await Promise.race([httpClosed, new Promise(resolve => { deadline = setTimeout(resolve, shutdownGraceMs); })]);
+    let backupsDone = false; backupsStopped.then(() => { backupsDone = true; });
+    const httpClosed = new Promise(resolve => server.close(err => { if (err) failures.push('http'); resolve(); }));
+    for (const [socket, conn] of connections) if (!conn.owed.length) socket.destroy();
+    // Once every connection has closed no request can arrive, so from then on `unfinished` only shrinks.
+    const handlersDone = () => unfinished.size ? new Promise(resolve => { onIdle = resolve; }) : undefined;
+    let deadline;
+    const drained = await Promise.race([httpClosed.then(handlersDone).then(() => true), new Promise(resolve => { deadline = setTimeout(resolve, shutdownGraceMs, false); })]);
     clearTimeout(deadline);
     const forced = !drained;
-    if (forced) { logger({event:'shutdown_deadline',connections:owed.size}); server.closeAllConnections(); for (const socket of owed.keys()) socket.destroy(); await httpClosed; }
+    if (forced) {
+      logger({event:'shutdown_deadline',connections:connections.size,unfinished:unfinished.size});
+      server.closeAllConnections(); for (const socket of connections.keys()) socket.destroy(); await httpClosed;
+    }
+    if (!backupsDone) logger({event:'shutdown_waiting_for_backup'});
     await backupsStopped;
+    const left = unfinished.size;
     try { store.close(); } catch { failures.push('database'); }
-    const result = { forced, durationMs: Math.round(performance.now() - started) };
+    const result = { forced, unfinished: left, durationMs: Math.round(performance.now() - started) };
     // Stage names only: error text can carry file paths or request data.
     if (failures.length) { logger({event:'shutdown_failed',stages:failures,...result}); throw new Error('QuoteTend did not shut down cleanly.'); }
     logger({event:'shutdown_complete',...result});
@@ -117,7 +149,8 @@ export function handleShutdownSignals(running, { proc = process, logger = log, e
     stopping = true; logger({event:'shutdown_signal',signal});
     const finish = code => { if (exited) return; exited = true; clearTimeout(watchdog); logger({event:'shutdown_exit',code}); exit(code); };
     // Last resort if a stage after the HTTP drain (a running backup, SQLite) stalls: exit with a logged reason before
-    // the platform's SIGKILL, which leaves none.
+    // the platform's SIGKILL, which leaves none. It claims nothing: no shutdown_complete is logged and SQLite is left to
+    // the operating system, whatever close() was still waiting for.
     const watchdog = setTimeout(() => { logger({event:'shutdown_watchdog_expired'}); finish(1); }, watchdogMs);
     new Promise(resolve => resolve(running.close())).then(result => result?.forced ? 1 : 0, () => 1).then(finish);
   };
