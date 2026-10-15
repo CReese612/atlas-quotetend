@@ -202,9 +202,10 @@ Not built and no privileged route was added. Findings that constrain the design:
 * Passwords are length-checked only (no breached-password check).
 * Operator CLIs assume the server is stopped; concurrent use is documented but not enforced.
 * ~~Results "began" date is off by one in US evenings~~ — fixed in Sprint 3A.1 (section 11).
-* Bounded graceful shutdown (raised by Codex QA; not part of 3A.1): `server.close()` waits for idle keep-alive
+* ~~Bounded graceful shutdown (raised by Codex QA; not part of 3A.1): `server.close()` waits for idle keep-alive
   connections, so a deploy or restart can stall until the platform kills the process (`tests/browser-rehearsal.mjs`
-  already has to force-close sockets to stop its test server). Needs a drain timeout and a matching platform setting.
+  already has to force-close sockets to stop its test server). Needs a drain timeout and a matching platform setting.~~
+  — fixed in Sprint 3B.1 ([SPRINT3B1_SHUTDOWN](SPRINT3B1_SHUTDOWN.md)); hosted verification still open.
 
 ## 9. Hosted-testing limitations
 

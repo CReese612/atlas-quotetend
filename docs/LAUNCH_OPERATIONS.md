@@ -66,11 +66,61 @@ Same-disk backups do not protect against disk/account loss. Before accepting cus
 
 No backups, old research or user files are automatically pruned. Check disk usage daily; review growth weekly. Seven days of six-hour backups means about 28 copies plus restarts/migration copies. Budget capacity from actual DB size, and approve retention only after off-service copies are verified. Do not treat volume snapshots as the database recovery procedure.
 
+## Shutdown and restart
+
+`node server.mjs` handles SIGTERM (what Render and containers send) and SIGINT (Ctrl+C) the same way: one bounded shutdown. Calling `close()` on a started server runs the same shutdown in code, without the process exit and watchdog (steps 1–6). The sequence:
+
+1. Stop accepting connections. New connection attempts are refused at once.
+2. Close every connection with no request in progress. That covers idle keep-alive connections and connections that have not sent a complete request: browser pre-connections and stalled clients. Before Sprint 3B.1 the second kind could hold shutdown open forever (see [SPRINT3B1_SHUTDOWN](SPRINT3B1_SHUTDOWN.md)).
+3. Let requests already in progress finish, for up to **10 seconds** (`SHUTDOWN_GRACE_MS` in server.mjs). Responses sent during shutdown carry `Connection: close`, so each connection ends with its response. A request that arrives on an already-open connection in this window is still answered, and then that connection closes.
+4. If a request is still running when the 10 seconds end, its connection is destroyed. This is a **forced** shutdown. The client gets no response; the app's existing "No success was confirmed. Reload to check saved data." handling applies.
+5. The six-hourly backup schedule is cancelled at step 1. A backup already running is allowed to finish, so its verified file is published or its `.partial` file removed as usual.
+6. SQLite is closed, exactly once, after steps 1–5.
+7. The process exits with **0** after a clean shutdown and **1** after a forced or failed one. As a last resort, a watchdog exits with 1 after **15 seconds** (`SHUTDOWN_WATCHDOG_MS`) if a later stage never finishes (for example a backup stuck on a stalled disk), so the reason is logged before the platform's SIGKILL.
+
+A second SIGTERM or SIGINT during shutdown is logged and ignored; it does not cut the drain short. Stopping faster means the platform's SIGKILL, which drops in-flight requests. A signal that arrives before startup has finished (migrations, the verified startup backup) is not intercepted and ends the process immediately, as before.
+
+**Why data stays consistent.** Every write is a single synchronous SQLite transaction; none spans an `await`. The database is never closed mid-transaction, so any request, including one cut off at the deadline or by SIGKILL, either committed completely or not at all. A request whose connection was destroyed at the deadline can still be running (password hashing, for instance). It then finds the database closed and fails without writing. Completed saves survive a restart; the tests listed in SPRINT3B1_SHUTDOWN check this.
+
+**Logs.** Shutdown events are JSON on the same stream as the other app logs. They contain event names, counts, durations and stage names only. They never contain paths, request data or error text.
+
+| Event | Meaning |
+| --- | --- |
+| `shutdown_signal` / `shutdown_signal_repeated` | `signal` received; repeats are ignored |
+| `shutdown_started` | `graceMs`, open `connections` |
+| `shutdown_deadline` | the grace period ran out with `connections` still open |
+| `shutdown_complete` | `forced` (false = clean), `durationMs` |
+| `shutdown_failed` | `stages` that failed (`http`, `database`), `forced`, `durationMs` |
+| `shutdown_watchdog_expired` | the 15 s ceiling was reached |
+| `shutdown_exit` | exit `code` |
+
+**Why 10 seconds.** Render's documentation (Deploys; Disks; "How Render handles zero-downtime deploys", read 2026-10-15) says:
+
+* Render sends SIGTERM, waits a shutdown delay (30 s by default, `maxShutdownDelaySeconds` up to 300 s), then sends SIGKILL.
+* A service with a persistent disk is stopped *before* its replacement starts, so every second spent draining is user-visible downtime.
+
+QuoteTend's slowest requests are bcrypt password hashing and a save of up to 5 MB. Ten seconds is ample for those and short enough not to stretch a deploy. The 15 s watchdog still fits inside the documented 30 s default even if no longer delay is applied.
+
+**Deployment implications.**
+
+* A routine restart or deploy should log `shutdown_complete` with `forced: false` and exit 0, normally within milliseconds.
+* Treat exit 1, `shutdown_deadline`, `shutdown_failed` or `shutdown_watchdog_expired` as an incident. Find which requests were in flight, then check the next `/healthz` and the latest backup.
+* With the persistent disk, downtime is roughly this shutdown (usually under a second, at most 15 s) plus startup (migrations, the verified startup backup, listen). Keep the maintenance window.
+* No new configuration is required, and render.yaml is unchanged.
+
+**Not verified on Render.** All evidence is local. Check these on staging with disposable data before relying on them:
+
+1. That SIGTERM reaches the Node process. If the start command runs under a shell that does not forward signals, there will be no `shutdown_signal` log and the process is SIGKILLed after the delay. A staging restart should log `shutdown_signal` through `shutdown_exit`.
+2. The real shutdown delay for a disk-backed service. render.yaml sets `maxShutdownDelaySeconds: 60`. A Render community forum report (not confirmed, and not addressed in the official docs) says the API refuses that setting for services with a disk. The app does not depend on it: its 15 s ceiling is inside the documented 30 s default.
+3. How Render's proxy handles connections the app closes during shutdown (retries or 502s), and whether it keeps idle upstream connections longer than Node's 5 s keep-alive timeout. The second is a pre-existing risk not changed here.
+4. Whether manual restarts, suspensions and instance replacements follow the same SIGTERM → delay → SIGKILL sequence as deploys.
+5. How long the slowest requests take on the starter plan's CPU.
+
 ## Monitoring and release rollback
 
 /healthz returns only ok/unhealthy, with 200/503, based on database readability and a successful backup within eight hours without a later failure. It is not proof of off-service copies or complete business correctness. Configure a live external monitor and an actionable notification recipient after approval; verify an alert by causing an isolated health failure. There is no connected alert provider today.
 
-App logs are JSON: timestamp, backup success/failure, or 5xx request ID/status/method. No bodies, email addresses, passwords, recovery codes, query strings, draft text or raw exception messages are logged. X-Request-Id links a user's failed request with the error log. Generic logging limits diagnostic depth deliberately. Monitor 5xx frequency, health, memory/CPU, backup age and disk space in hosting operations. Provider access-log retention and permissions need review too.
+App logs are JSON: timestamp, backup success/failure, shutdown events (see Shutdown and restart), or 5xx request ID/status/method. No bodies, email addresses, passwords, recovery codes, query strings, draft text or raw exception messages are logged. X-Request-Id links a user's failed request with the error log. Generic logging limits diagnostic depth deliberately. Monitor 5xx frequency, health, memory/CPU, backup age and disk space in hosting operations. Provider access-log retention and permissions need review too.
 
 Before each deploy: save the current release identifier, export a consistent DB copy off-service, test a copy against the new migration, and run the suites. Manual deployments only. Persistent disks mean brief downtime; arrange a maintenance window.
 
