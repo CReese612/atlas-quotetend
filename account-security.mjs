@@ -1,5 +1,6 @@
 import {createHash,randomBytes,randomUUID} from 'node:crypto';
-export const tokenHash=value=>createHash('sha256').update(String(value||'')).digest('hex');
+// Only strings are tokens. A JSON array or object must never be coerced into a matching code (['code'] -> 'code').
+export const tokenHash=value=>createHash('sha256').update(typeof value==='string'?value:'').digest('hex');
 export function migrateSecurity(db,path) {
  const v=db.prepare('PRAGMA user_version').get().user_version;
  if(v>=2)return;

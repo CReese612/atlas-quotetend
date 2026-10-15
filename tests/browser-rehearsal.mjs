@@ -22,11 +22,13 @@ const removeDir = () => dirname(dir) === tmpdir() && basename(dir).startsWith('q
 // still await the real shutdown, which stops the backup schedule and closes SQLite.
 const stopServer = async server => { const closing = server.close(); server.server.closeAllConnections(); await closing; };
 let running = await startServer({ port: 0, dbPath, logger: () => {} });
+// QUOTETEND_BROWSER_TZ (an IANA name) sets the browser's own zone so runs can prove the app does not depend on it.
+const BROWSER_TZ = process.env.QUOTETEND_BROWSER_TZ ? { timezoneId: process.env.QUOTETEND_BROWSER_TZ } : {};
 let browser;
 try { browser = await chromium.launch({ ...(process.env.QUOTETEND_BROWSER_PATH ? { executablePath: process.env.QUOTETEND_BROWSER_PATH } : { channel: process.env.QUOTETEND_BROWSER || 'msedge' }), headless: true }); }
 catch (error) { await stopServer(running); await removeDir(); throw error; }
 let base = `http://127.0.0.1:${running.port}`;
-const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const context = await browser.newContext({ ...BROWSER_TZ, viewport: { width: 1440, height: 900 } });
 await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
 const page = await context.newPage();
 const errors = [];

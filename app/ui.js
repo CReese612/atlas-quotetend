@@ -4,7 +4,7 @@
 // Row helpers take `quotes` only for opt-out checks, so callers may pass D.optOutBlocks(quotes).
 // Bar and segment sizes are emitted as data attributes and applied with applySizes(), because the
 // Content-Security-Policy does not allow inline style attributes.
-import { daysBetween, followupState, optOutSources, eligible, CHANNELS, CONTACT_RESULTS, TRADES, addDays } from '/domain.js';
+import { daysBetween, followupState, optOutSources, eligible, CHANNELS, CONTACT_RESULTS, TRADES, addDays, historyDay, todayISO } from '/domain.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const usd0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -12,7 +12,7 @@ const usd2 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD'
 export const money = n => Number.isFinite(n) ? (Number.isInteger(Math.round(n * 100) / 100) ? usd0 : usd2).format(n) : '—';
 export const moneyShort = n => n >= 1e6 ? `$${(n / 1e6).toFixed(2).replace(/\.?0+$/, '')}M` : n >= 1000 ? `$${(n / 1000).toFixed(n >= 1e5 ? 0 : 1).replace(/\.0$/, '')}k` : money(n);
 const asDate = iso => new Date(`${iso}T12:00:00`);
-const thisYear = () => new Date().getFullYear();
+const thisYear = () => Number(todayISO().slice(0, 4)); // the business year, not the browser's
 export const shortDate = iso => iso ? asDate(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(asDate(iso).getFullYear() !== thisYear() ? { year: 'numeric' } : {}) }) : '—';
 export const longDate = iso => asDate(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 export const weekdayDate = iso => asDate(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', ...(asDate(iso).getFullYear() !== thisYear() ? { year: 'numeric' } : {}) });
@@ -137,7 +137,7 @@ export function ageChart(buckets) {
 const HISTORY_ICON = { created: 'file', contact: 'Phone', outcome: 'checkCircle', optout: 'pause', import: 'import', update: 'pen', schedule: 'calendar', correction: 'reset' };
 const historyTone = h => h.type === 'outcome' ? (/\bwon\b/.test(h.text) ? 'won' : /\blost\b/.test(h.text) ? 'lost' : 'outcome') : h.type;
 const historyIcon = h => h.type === 'contact' ? (CHANNELS.find(c => h.text.startsWith(c + ' ')) || 'Phone') : HISTORY_ICON[h.type] || (/opted out/i.test(h.text) ? 'pause' : 'pen');
-const historyDate = h => h.date || h.at.slice(0, 10);
+const historyDate = historyDay; // never throws; see the policy in domain.js
 export function activityItem(a, today) {
   return `<li class="qt-act qt-act--${historyTone(a)}"><span class="qt-act__icon">${icon(historyIcon(a))}</span><div class="qt-act__body"><p><button class="qt-link" type="button" data-open="${esc(a.estimateId)}">${esc(a.name)}</button> <span>${esc(a.text)}</span></p><time datetime="${esc(historyDate(a))}">${esc(ago(historyDate(a), today))}</time></div></li>`;
 }

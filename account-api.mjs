@@ -26,7 +26,10 @@ export async function accountAPI(store, port, config={}) {
     }
     next();
   });
-  api.use(express.json({ limit: 5_000_000 }));
+  // Bodies are bounded before anyone is identified: sign-in, recovery and password bodies are tiny, and the 5 MB
+  // workspace parser only runs after the caller is authenticated and addressing their own business (below).
+  const small = express.json({ limit: '16kb' }), large = express.json({ limit: 5_000_000 });
+  api.use((req, res, next) => req.path.startsWith('/workspaces/') ? next() : small(req, res, err => err?.type === 'entity.too.large' ? res.status(413).json({ error: 'Request is too large.' }) : next(err)));
   api.use(session({ name: cookieName, secret: config.secret || store.secret, store: new SQLiteSessions(store.db),
     resave: false, saveUninitialized: false,
     cookie: { httpOnly: true, sameSite: 'strict', secure: !!config.production, path: '/api', maxAge: HOURS_8 } }));
@@ -70,8 +73,11 @@ export async function accountAPI(store, port, config={}) {
     });
   });
   api.use((req, res, next) => {
-    const owner = req.session.ownerId && store.ownerById(req.session.ownerId);
-    if (!owner || store.suspended(owner.id) || req.session.credentialVersion!==tokenHash(owner.password_hash) || !req.session.started || Date.now() - req.session.started >= HOURS_8) {
+    const owner = typeof req.session.ownerId==='string' && store.ownerById(req.session.ownerId);
+    // The start time must be a finite number no later than now and under eight hours old. It is type-checked before any
+    // arithmetic: subtracting a hostile stored object would throw (a 500), and NaN or a future value would skip the limit.
+    const started=req.session.started,valid=Number.isFinite(started),age=valid?Date.now()-started:NaN;
+    if (!owner || store.suspended(owner.id) || req.session.credentialVersion!==tokenHash(owner.password_hash) || !valid || !(age>=0 && age<HOURS_8)) {
       return res.status(401).json({ error: 'Please sign in again. Unsaved changes have not been applied.' });
     }
     req.owner = owner; next();
@@ -96,6 +102,7 @@ export async function accountAPI(store, port, config={}) {
     if (req.params.businessId !== req.owner.business_id) return res.status(404).json({ error: 'Workspace not found.' });
     next();
   });
+  api.use('/workspaces/:businessId', large);
   api.get('/workspaces/:businessId', (req, res) => res.json(store.workspace(req.owner.business_id)));
 
   api.put('/workspaces/:businessId', (req,res)=>res.status(405).json({error:'Reload QuoteTend. Whole-workspace saves are disabled; use focused operations or explicit restore.'}));
@@ -105,7 +112,12 @@ export async function accountAPI(store, port, config={}) {
   api.get('/workspaces/:businessId/results', (req,res)=>{
     try {res.json(store.results(req.owner.business_id,req.query.from,req.query.to));}catch(e){res.status(400).json({error:e.message});}
   });
-  api.get('/workspaces/:businessId/events', (req,res)=>res.json(store.events(req.owner.business_id)));
+  // The ledger numbers events across every business. Callers get this business's own 1..n ordinals so the gaps
+  // cannot reveal how much other contractors are doing; internal ordering and stored references are unchanged.
+  api.get('/workspaces/:businessId/events', (req,res)=>{
+    const events=store.events(req.owner.business_id),ordinal=new Map(events.map((e,i)=>[e.sequence,i+1]));
+    res.json(events.map(e=>({...e,sequence:ordinal.get(e.sequence),...(e.data.outcomeSequence!==undefined?{data:{...e.data,outcomeSequence:ordinal.get(e.data.outcomeSequence)}}:{})})));
+  });
   api.get('/workspaces/:businessId/snapshots', (req,res)=>res.json(store.snapshots(req.owner.business_id)));
   api.get('/workspaces/:businessId/snapshots/:snapshotId', (req,res)=>{
     const snapshot=store.snapshot(req.owner.business_id,req.params.snapshotId);

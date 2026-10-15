@@ -76,7 +76,7 @@ export function attachLedger(store) {
   store.snapshot=(business,id)=>{const r=db.prepare('SELECT payload FROM safety_snapshots WHERE business_id=? AND id=?').get(business,id);return r && JSON.parse(r.payload);};
   store.command=(owner, command)=>{
     const business=owner.business_id;
-    if(!command || !/^[a-zA-Z0-9-]{16,80}$/.test(command.requestId||'') || !Number.isSafeInteger(command.revision) || command.revision<0) fail('A request ID and current workspace revision are required.');
+    if(!command || typeof command.requestId!=='string' || !/^[a-zA-Z0-9-]{16,80}$/.test(command.requestId) || !Number.isSafeInteger(command.revision) || command.revision<0) fail('A request ID and current workspace revision are required.');
     const digest=createHash('sha256').update(JSON.stringify(command)).digest('hex');
     db.exec('BEGIN IMMEDIATE');
     try {

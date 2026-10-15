@@ -3,14 +3,16 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { previewImport, exportCSV, eligible, due, metrics, demoData, normalizeWorkspace, draftMessage, recordContact, parseBackup, optOutSources } from '../domain.js';
 import { inspectSpreadsheet, previewSpreadsheet } from '../import-mapping.js';
-const fixture = name => readFile(new URL(`../Grok Bot Research & Product Testing/${name}`, import.meta.url), 'utf8');
+// Synthetic import files committed with the repository (tests/fixtures/import). They replace the former external
+// research-folder dependency, so these tests run on a clean checkout.
+const fixture = name => readFile(new URL(`./fixtures/import/${name}`, import.meta.url), 'utf8');
 const valid = rows => rows.filter(r => !r.errors.length).map(r => r.quote);
 const today = '2026-09-16';
 
 test('Grok conflicts: all inconsistent rows held, repeats distinguished, existing closed/opted-out untouched', async () => {
-  const seed = valid(previewImport(await fixture('seed-existing_GrokBot_2.csv')));
+  const seed = valid(previewImport(await fixture('seed-existing.csv')));
   const before = JSON.stringify(seed);
-  const preview = previewImport(await fixture('estimates-conflicts_GrokBot_2.csv'), seed);
+  const preview = previewImport(await fixture('estimates-conflicts.csv'), seed);
   assert.deepEqual(valid(preview).map(q => q.estimate_id), ['EST-C001', 'EST-C003', 'EST-C004']);
   assert.deepEqual(Object.fromEntries(['ready', 'held', 'repeat', 'conflict', 'existing'].map(s => [s, preview.filter(r => r.outcome === s).length])), { ready: 3, held: 2, repeat: 1, conflict: 3, existing: 1 });
   assert.equal(JSON.stringify(seed), before);
@@ -23,12 +25,12 @@ test('Grok conflicts: all inconsistent rows held, repeats distinguished, existin
   assert.equal(workspace.find(q => q.estimate_id === 'EST-S003').do_not_contact, true);
 });
 test('Grok valid and invalid files meet exact counts and frozen-date queue rules', async () => {
-  const rows = previewImport(await fixture('estimates-valid_GrokBot_2.csv'));
+  const rows = previewImport(await fixture('estimates-valid.csv'));
   const quotes = valid(rows);
   assert.equal(quotes.length, 10);
   assert.deepEqual(quotes.filter(q => due(q, today, quotes)).map(q => q.estimate_id), ['EST-V001', 'EST-V003', 'EST-V007']);
-  assert.equal(previewImport(await fixture('estimates-valid_GrokBot_2.csv'), quotes).filter(r => r.outcome === 'existing').length, 10);
-  const invalid = previewImport(await fixture('estimates-invalid_GrokBot_2.csv'));
+  assert.equal(previewImport(await fixture('estimates-valid.csv'), quotes).filter(r => r.outcome === 'existing').length, 10);
+  const invalid = previewImport(await fixture('estimates-invalid.csv'));
   assert.equal(invalid.filter(r => r.outcome === 'invalid').length, 7);
   assert.equal(valid(invalid).length, 0);
 });

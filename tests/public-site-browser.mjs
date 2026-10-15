@@ -19,6 +19,8 @@ const MARKETING = ['index.html', 'how-it-works.html', 'features.html', 'faq.html
 
 const server = await startPublicServer({ port: 0 });
 const base = server.url;
+// QUOTETEND_BROWSER_TZ (an IANA name) sets the browser's own zone so runs can prove the app does not depend on it.
+const BROWSER_TZ = process.env.QUOTETEND_BROWSER_TZ ? { timezoneId: process.env.QUOTETEND_BROWSER_TZ } : {};
 const browser = await chromium.launch({ ...(process.env.QUOTETEND_BROWSER_PATH ? { executablePath: process.env.QUOTETEND_BROWSER_PATH } : { channel: process.env.QUOTETEND_BROWSER || 'msedge' }), headless: true });
 const results = [];
 const shots = [];
@@ -38,7 +40,7 @@ async function group(name, fn) {
 // Fresh context per scenario; collect page errors and console errors (font CDN failures are tolerated
 // so the suite can run offline).
 async function open(path, { width = 1440, height = 900, mobile = false, reducedMotion = 'no-preference', clipboard = false, config, fixedTime = false } = {}) {
-  const context = await browser.newContext({ viewport: { width, height }, isMobile: mobile, hasTouch: mobile, reducedMotion });
+  const context = await browser.newContext({ ...BROWSER_TZ, viewport: { width, height }, isMobile: mobile, hasTouch: mobile, reducedMotion });
   await blockLiveFormService(context);
   if (clipboard) await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base.replace(/\/$/, '') });
   if (config) await context.route('**/assets/js/site-config.js', route => route.fulfill({ contentType: 'text/javascript', body: `export const SITE_CONFIG = Object.freeze(${JSON.stringify({ contactEmail: '', bookingUrl: '', formEndpoint: '', ...config })});` }));
@@ -398,7 +400,7 @@ try {
     const port = new URL(base).port;
     const publicBrowser = await chromium.launch({ ...(process.env.QUOTETEND_BROWSER_PATH ? { executablePath: process.env.QUOTETEND_BROWSER_PATH } : { channel: process.env.QUOTETEND_BROWSER || 'msedge' }), headless: true, args: ['--host-resolver-rules=MAP public.quotetend-fixture.net 127.0.0.1'] });
     try {
-      const unconfigured = await publicBrowser.newContext({ viewport: { width: 1440, height: 900 } });
+      const unconfigured = await publicBrowser.newContext({ ...BROWSER_TZ, viewport: { width: 1440, height: 900 } });
       await blockLiveFormService(unconfigured);
       await unconfigured.route('**/assets/js/site-config.js', route => route.fulfill({ contentType: 'text/javascript', body: "export const SITE_CONFIG = Object.freeze({ formEndpoint: '', bookingUrl: '', contactEmail: '' });" }));
       const page = await unconfigured.newPage();
@@ -411,7 +413,7 @@ try {
       assert.equal(await page.locator('a[href^="mailto:"]').count(), 0);
       assert.deepEqual(errors, []);
       // As deployed with the shipped configuration.
-      const shipped = await publicBrowser.newContext({ viewport: { width: 1440, height: 900 } });
+      const shipped = await publicBrowser.newContext({ ...BROWSER_TZ, viewport: { width: 1440, height: 900 } });
       await blockLiveFormService(shipped);
       const live = await shipped.newPage();
       await live.goto(`http://public.quotetend-fixture.net:${port}/`, { waitUntil: 'networkidle' });
@@ -918,7 +920,7 @@ try {
   });
 
   await group('demo works when browser storage is blocked', async () => {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const context = await browser.newContext({ ...BROWSER_TZ, viewport: { width: 1280, height: 800 } });
     await context.addInitScript(() => {
       const deny = { get() { throw new DOMException('blocked', 'SecurityError'); } };
       Object.defineProperty(window, 'localStorage', deny); Object.defineProperty(window, 'sessionStorage', deny);

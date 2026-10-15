@@ -53,8 +53,9 @@ export async function startServer({ port = Number(process.env.PORT || 4173), dbP
   });
   app.use((err, req, res, next) => {
     if (res.headersSent) return next(err);
-    const status = err.type === 'entity.too.large' ? 413 : err.type === 'entity.parse.failed' ? 400 : 500;
-    res.status(status).json({ error: status === 413 ? 'Workspace exceeds the 5 MB limit.' : status === 400 ? 'Invalid JSON request.' : 'Unable to complete the request. No success was confirmed. Reload to check saved data.' });
+    // A malformed request (bad JSON, an undecodable %-escape in the URL) is the caller's error, not a server fault.
+    const status = err.type === 'entity.too.large' ? 413 : err.type === 'entity.parse.failed' || err.status === 400 || err.statusCode === 400 ? 400 : 500;
+    res.status(status).json({ error: status === 413 ? 'Workspace exceeds the 5 MB limit.' : status === 400 ? (err.type === 'entity.parse.failed' ? 'Invalid JSON request.' : 'Invalid request.') : 'Unable to complete the request. No success was confirmed. Reload to check saved data.' });
   });
   let server;
   try { server = await new Promise((resolve, reject) => { const s = app.listen(port, config.host || '127.0.0.1', () => resolve(s)); s.on('error', reject); }); }

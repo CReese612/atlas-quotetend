@@ -152,7 +152,7 @@ export function resultsView(ctx) {
 const weeklyNote = (weeks, started) => { const note = weeklyCoverage(weeks, started, shortDate); return note ? `<p class="qt-help" data-weekly-coverage="${note.kind}">${esc(note.text)}</p>` : ''; };
 function resultsBody(ctx) {
   const r = ctx.results.data, ui = ctx.ui, { quotes } = ctx.ws, m = D.metrics(quotes, ctx.today), st = D.statusTotals(quotes), bs = D.pipelineByState(quotes, ctx.today);
-  const started = r.startedAt.slice(0, 10);
+  const started = D.businessDateOf(r.startedAt);
   return `${resultCards(r, ui.group)}
     <div class="results-grid">
       ${panel('Cohort outcomes', `${plural(r.counts.followed, 'estimate')} first followed up in this range, classified as of today`, cohortBar(r), { label: 'Cohort outcomes' })}
