@@ -1,6 +1,10 @@
 // Sprint 3A.1: the Oregon business day in a real browser, with the clock frozen and the SERVER and the BROWSER set to
 // deliberately different zones (neither is Pacific). The UI must show the same business-day results in every scenario.
-// Instants are in the real future on purpose: Chromium expires cookies against the real clock, so a frozen date in the past would drop the session cookie.
+// Chromium expires cookies against the REAL clock even when the page clock is frozen, so every frozen instant must lie in the
+// real future or the session cookie is born expired. Scenarios are therefore derived from the moment the test runs
+// (tests/helpers/future-scenarios.mjs: nearest upcoming occurrence of each calendar condition, expected Oregon day from an
+// independent rule-based oracle) and guarded: a stale fixture raises a FIXTURE CLOCK ERROR instead of looking like a product bug.
+// Historical boundary instants are covered in the unit suite (business-calendar.test.mjs), where no cookie is involved.
 // The server runs as a separate process (frozen clock + chosen zone); the browser's clock and zone are set by Playwright.
 // Run: node tests/business-calendar-browser.mjs   (QUOTETEND_BROWSER_PATH / QUOTETEND_BROWSER select the browser)
 import { chromium } from 'playwright';
@@ -14,14 +18,14 @@ import { createServer } from 'node:net';
 import bcrypt from 'bcryptjs';
 import { openAccounts } from '../account-store.mjs';
 import { demoData, addDays } from '../domain.js';
+import { futureScenarios, assertCookieStaysValid, FixtureClockError } from './helpers/future-scenarios.mjs';
 
 const password = 'Fictional-calendar-password-6641!';
-// frozen instant, Oregon business day at that instant, server process zone, browser zone
-const SCENARIOS = [
-  { label: 'Oregon 22:30 while Chicago and UTC are already tomorrow', now: '2026-10-14T05:30:00.000Z', today: '2026-10-13', short: 'Oct 13', tomorrow: 'Oct 14', serverTz: 'America/Chicago', browserTz: 'Pacific/Kiritimati' },
-  { label: 'one second before Pacific midnight (PST)', now: '2026-12-15T07:59:59.000Z', today: '2026-12-14', short: 'Dec 14', tomorrow: 'Dec 15', serverTz: 'Pacific/Kiritimati', browserTz: 'UTC' },
-  { label: 'spring-forward morning 2027, 03:00 PDT', now: '2027-03-14T10:00:00.000Z', today: '2027-03-14', short: 'Mar 14', tomorrow: 'Mar 15', serverTz: 'UTC', browserTz: 'America/Chicago' },
-];
+const realNow = Date.now();
+// frozen instant (future), Oregon business day at that instant, server process zone, browser zone
+const SCENARIOS = futureScenarios(realNow);
+console.log(`Real clock ${new Date(realNow).toISOString()}; scenarios: ${SCENARIOS.map(s => s.now).join(', ')}`);
+for (const s of SCENARIOS) assertCookieStaysValid(s.ms, realNow);
 const freePort = () => new Promise((resolve, reject) => { const s = createServer(); s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); s.on('error', reject); });
 
 const browser = await chromium.launch({ ...(process.env.QUOTETEND_BROWSER_PATH ? { executablePath: process.env.QUOTETEND_BROWSER_PATH } : { channel: process.env.QUOTETEND_BROWSER || 'msedge' }), headless: true });
@@ -63,7 +67,17 @@ try {
       await page.locator('#auth-form [name=email]').fill('oregon-browser@example.com');
       await page.locator('#auth-form [name=password]').fill(password);
       await page.locator('#auth-submit').click();
-      await page.waitForURL('**/account#overview'); await page.locator('h1').waitFor();
+      try { await page.waitForURL('**/account#overview'); await page.locator('h1').waitFor(); }
+      catch (error) {
+        // Tell a stale fixture clock from a product failure: with no usable session cookie the browser has discarded it.
+        const cookies = (await context.cookies()).filter(c => c.name.startsWith('quotetend.sid'));
+        if (!cookies.length) throw new FixtureClockError(`sign-in returned no session cookie the browser kept (real clock ${new Date().toISOString()}, frozen instant ${s.now}); the cookie was probably born expired. Original error: ${error.message.split('\n')[0]}`);
+        throw error;
+      }
+      // Real authentication happened: the browser holds an unexpired HttpOnly, SameSite=Strict session cookie and the protected API answers.
+      const session = (await context.cookies()).find(c => c.name.startsWith('quotetend.sid'));
+      assert.ok(session && session.httpOnly && session.sameSite === 'Strict' && session.expires * 1000 > Date.now(), label + ': a genuine, unexpired session cookie was set');
+      assert.equal((await api('/me')).status, 200, label + ': the protected workspace API accepts the session');
 
       // Due and overdue are judged on the Oregon day: overdue + due today count, "tomorrow" does not.
       assert.equal(await page.locator('[data-kpi="due"] .qt-kpi__value').innerText(), '2', label + ': due & overdue count');
