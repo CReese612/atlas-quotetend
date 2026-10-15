@@ -575,6 +575,20 @@ test('P2-002: a startup failure after the database opens and the first backup ru
   assert.doesNotThrow(() => rmSync(dbPath));
 });
 
+test('P2-002 guard: a failed initial backup still reports its own error and releases SQLite', { timeout: 30_000 }, async t => {
+  const defer = cleanupFor(t), dir = tempDir(defer), dbPath = join(dir, 'accounts.sqlite');
+  const fsp = createRequire(import.meta.url)('node:fs/promises');
+  const mocked = t.mock.method(fsp, 'mkdir', async () => { throw new Error('fictional disk failure'); }); // first step of a backup
+  syncBuiltinESMExports();
+  const restore = () => { mocked.mock.restore(); syncBuiltinESMExports(); }; defer(restore);
+  const before = handles();
+  await assert.rejects(startServer({ port: 0, dbPath, config: { ...configuration({}), backupDir: join(dir, 'backups') }, logger: () => {} }),
+    { message: 'Initial backup failed; server not started.' });
+  restore();
+  await assertReleased(before, 'failed initial backup');
+  assert.doesNotThrow(() => rmSync(dbPath));
+});
+
 test('P2-001 contract: direct close() waits for a running backup, never closes SQLite under it, and logs why', { timeout: 30_000 }, async t => {
   const env = await launch(t, { shutdownGraceMs: 60_000 }), held = holdBackup(t, env);
   let backupDone = false; const backup = env.running.backups.run().then(path => { backupDone = true; return path; });

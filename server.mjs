@@ -29,8 +29,20 @@ export function staticFiles() {
 }
 export async function startServer({ port = Number(process.env.PORT || 4173), dbPath = defaultDatabase(), config = configuration(), logger = log, shutdownGraceMs = SHUTDOWN_GRACE_MS } = {}) {
   const store = openAccounts(dbPath);
-  const backups=scheduledBackups(store.db,config.backupDir || join(dirname(dbPath),'backups'),logger);
-  try {await backups.run();}catch(e){await backups.stop();store.close();throw new Error('Initial backup failed; server not started.');}
+  let backups = null;
+  // From here the database is open and, once created, so is the backup schedule. A failure anywhere later in startup
+  // (the initial backup, accountAPI() setup, listen) stops the schedule, closes SQLite and rethrows the original error.
+  try {
+    backups = scheduledBackups(store.db,config.backupDir || join(dirname(dbPath),'backups'),logger);
+    try {await backups.run();}catch{throw new Error('Initial backup failed; server not started.');}
+    return await serve({ store, backups, port, config, logger, shutdownGraceMs });
+  } catch (err) {
+    await backups?.stop();
+    try { store.close(); } catch { /* keep the startup error */ }
+    throw err;
+  }
+}
+async function serve({ store, backups, port, config, logger, shutdownGraceMs }) {
   const app = express();
   if(config.production)app.set('trust proxy',1); app.disable('x-powered-by');
   const files = staticFiles();
@@ -97,8 +109,7 @@ export async function startServer({ port = Number(process.env.PORT || 4173), dbP
     app(req, res);
   });
   server.on('connection', socket => { connections.set(socket, { owed: [], closing: false }); socket.once('close', () => connections.delete(socket)); });
-  try { await new Promise((resolve, reject) => { server.on('error', reject); server.listen(port, config.host || '127.0.0.1', resolve); }); }
-  catch (err) { await backups.stop();store.close(); throw err; }
+  await new Promise((resolve, reject) => { server.on('error', reject); server.listen(port, config.host || '127.0.0.1', resolve); });
   // One shutdown however often it is requested:
   // 1. Stop accepting connections and drop every socket that owes no response (no request was accepted on it).
   // 2. For up to shutdownGraceMs, let accepted requests finish. Each connection closes after the last response it owes.
