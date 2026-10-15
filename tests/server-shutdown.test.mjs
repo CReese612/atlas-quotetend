@@ -45,7 +45,10 @@ function tempDir(defer) {
   return dir;
 }
 const handles = () => { const counts = {}; for (const name of process.getActiveResourcesInfo()) counts[name] = (counts[name] || 0) + 1; return counts; };
-function assertReleased(before, label) {
+async function assertReleased(before, label) {
+  // A closed handle stays listed until libuv's close phase runs, two loop turns later (true of a plain node:http server
+  // too), so let those turns pass before counting. This waits on the event loop, not on the clock.
+  for (let turn = 0; turn < 2; turn++) await new Promise(setImmediate);
   const after = handles();
   for (const name of ['Timeout', 'TCPServerWrap', 'TCPSocketWrap']) assert.ok((after[name] || 0) <= (before[name] || 0), `${label}: ${name} left open (${before[name] || 0} before, ${after[name] || 0} after)`);
 }
@@ -244,7 +247,7 @@ test('L: clean and forced shutdowns release their timers, server handle and sock
     }
     assert.equal((await within(env.close(), BOUND, 'close()'))?.forced, grace < 1000);
     await within(Promise.all(clients.map(c => c.closed)), BOUND, 'client sockets closing');
-    assertReleased(before, grace < 1000 ? 'forced shutdown' : 'clean shutdown');
+    await assertReleased(before, grace < 1000 ? 'forced shutdown' : 'clean shutdown');
   }
 });
 
@@ -255,7 +258,7 @@ test('startup on a port already in use fails with the listen error and releases 
   const before = handles();
   await assert.rejects(startServer({ port: blocker.address().port, dbPath: join(dir, 'accounts.sqlite'), config: { ...configuration({}), backupDir: join(dir, 'backups') }, logger: () => {} }),
     { code: 'EADDRINUSE' });
-  assertReleased(before, 'failed startup');
+  await assertReleased(before, 'failed startup');
   // Windows cannot delete an open SQLite file, so there this also proves the database was closed.
   assert.doesNotThrow(() => rmSync(join(dir, 'accounts.sqlite')));
 });
