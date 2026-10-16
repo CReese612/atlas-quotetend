@@ -24,7 +24,7 @@ const SEEDS = [
   ['FR-2321', 'Marcus & Elena Ruiz', 'ruiz.household@example.com', '555-0117', 'Chestnut Ridge Rd', 'Siding', 'Fiber-cement siding · full wrap with trim', 38750, 12, 'sent', -3, false,
     'Comparing Iron Gray and Aged Pewter. Needs HOA design approval before signing.', [[9, 'Phone', 'Walked through both color palettes; HOA meets next week']]],
   ['FR-2314', 'Kevin O’Neill', 'kevin.oneill@example.com', '555-0168', 'Sycamore Ct', 'Roofing', 'Roof replacement · 26 sq with ridge vent upgrade', 16950, 19, 'sent', -2, false,
-    'Hail claim in progress. Adjuster revisit pending; wants the ridge vent upgrade either way.', [[15, 'Text', 'Confirmed he received the estimate'], [8, 'Phone', 'Waiting on the adjuster’s second visit']]],
+    'Windstorm claim open after a fallen limb. Adjuster revisit pending; wants the ridge vent upgrade either way.', [[15, 'Text', 'Confirmed he received the estimate'], [8, 'Phone', 'Waiting on the adjuster’s second visit']]],
   ['FR-2325', 'Priya Nandakumar', 'priya.n@example.com', '555-0133', 'Briarwood Ln', 'Windows & doors', 'Window replacement · 14 double-hung, vinyl Low-E', 17960, 9, 'sent', -1, false,
     'Asked about financing options and whether winter installation is possible.', []],
   ['FR-2327', 'Tom Becker', 'tom.becker@example.com', '555-0151', 'Ash Hollow Dr', 'Roofing', 'Storm-damage roof repair · insurance scope', 8240, 7, 'sent', 0, false,
@@ -195,8 +195,9 @@ export function statusTotals(quotes) {
 // Same template as domain.js draftMessage, signed by the fictional company.
 export function draftMessage(q, company = COMPANY.name, quotes = [q]) {
   if (!eligible(q, quotes)) throw new Error('Follow-up drafts are only available for sent estimates without an estimate or shared-email opt-out.');
-  const amount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(q.amount_usd);
-  return `Hi ${q.customer_name.split(' ')[0]},\n\nI wanted to check in on the ${amount} estimate for ${q.job_description.toLowerCase()}. Have you had a chance to look it over?\n\nIf you have any questions or would like to discuss next steps, just let me know. Happy to help.\n\nThanks,\n${company}`;
+  const amount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: Number.isInteger(q.amount_usd) ? 0 : 2, maximumFractionDigits: 2 }).format(q.amount_usd);
+  const job = q.job_description.trim().replace(/^[A-Z](?=[a-z])/, c => c.toLowerCase());
+  return `Hi ${q.customer_name.split(' ')[0]},\n\nI wanted to check in on the ${amount} estimate for ${job}. Have you had a chance to look it over?\n\nIf you have any questions or would like to discuss next steps, just let me know. Happy to help.\n\nThanks,\n${company}`;
 }
 
 // ---------- Commands (return a new workspace; never mutate the input) ----------

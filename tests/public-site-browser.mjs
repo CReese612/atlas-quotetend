@@ -645,7 +645,8 @@ try {
     assert.equal(await page.locator('[data-app]').evaluate(el => el.inert), true, 'app behind the record is inert');
     const historyCount = () => count(page, '[data-drawer] .qt-timeline__item');
     const h0 = await historyCount();
-    assert.match(await page.locator('#draft-text').inputValue(), /Hi Dana,[\s\S]*\$21,480\.00 estimate/);
+    // Sprint 4A: whole-dollar amounts read "$21,480" (no ".00"), matching the customer app's template.
+    assert.match(await page.locator('#draft-text').inputValue(), /Hi Dana,[\s\S]*\$21,480 estimate for roof replacement/);
     // Edit and save the draft: no contact is recorded
     const custom = 'Hi Dana — quick check-in on your roof estimate. Happy to walk through the ice & water shield options. (Fictional)';
     await page.locator('#draft-text').fill(custom);

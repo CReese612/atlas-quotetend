@@ -161,9 +161,25 @@ try {
   await page.locator('[data-action="import-commit"]').waitFor();
   const reimport = await page.locator('.qt-import-rows').innerText();
   assert.match(reimport, /Duplicate · skipped\s+Dana Whitfield\s+Row 2 · R-1001/); assert.match(reimport, /Existing ID · protected\s+Dana Whitfield\s+Row 3 · R-1001[\s\S]*nothing overwritten/); assert.match(reimport, /Ready\s+New Lead\s+Row 4 · R-1010/);
+  // Sprint 4A: the protected row says what differs, and the summary names the estimate to review.
+  assert.match(reimport, /Differs from the saved estimate; nothing overwritten\. Amount: file \$99,999, saved \$21,480/);
+  assert.match(await page.locator('[data-import-revised]').innerText(), /1 saved estimate differs from this file[\s\S]*R-1001 \(amount, notes\)/);
   await page.locator('[data-action="import-restart"]').last().click();
   assert.deepEqual((await state()).quotes, current.quotes, 'cancelled re-import changed nothing');
   pass('re-import conflict review protects existing records; cancel leaves data untouched');
+
+  // Sprint 4A: a spreadsheet without follow-up dates can give its sent estimates a first follow-up instead of
+  // leaving every one under "Needs a date". The choice is shown in the preview; cancelling saves nothing.
+  await pasteImport(`Quote #,Client,Project,Total,Date Issued\nR-1020,Undated Lead,Gutter repair,"$1,100.00",${mdy(addDays(today, -2))}`);
+  assert.match(await page.locator('main').innerText(), /1 row in this file has no follow-up date/);
+  await page.locator('[data-import-option="defaultFollowUp"]').fill(addDays(today, 1));
+  await page.locator('[data-import-option="optOutReviewed"]').check();
+  await page.locator('[data-action="import-preview"]').click();
+  await page.locator('[data-action="import-commit"]').waitFor();
+  assert.match(await page.locator('.qt-import-rows').innerText(), new RegExp(`first follow-up set to ${addDays(today, 1)}, as you chose`));
+  await page.locator('[data-action="import-restart"]').last().click();
+  assert.deepEqual((await state()).quotes, current.quotes, 'cancelled preview changed nothing');
+  pass('optional first follow-up date for undated sent rows is previewed before anything is saved');
 
   // 8–9. Dashboard figures equal the server records.
   await nav('overview');
@@ -261,6 +277,7 @@ try {
   assert.equal(current.quotes.find(q => q.estimate_id === 'R-1001').next_follow_up_date, addDays(today, 7));
   assert.equal((await events()).filter(e => e.type === 'contact_logged').length, 1, 'scheduling is not a contact');
   await page.locator('[data-outcome="won"]').click();
+  assert.doesNotMatch(await page.locator('#confirm-body').innerText(), /No contact is logged/, 'a decision after a logged contact needs no Results note');
   await page.locator('[data-confirm-ok]').click(); await toast(/marked won/);
   current = await state();
   const won = current.quotes.find(q => q.estimate_id === 'R-1001');
@@ -327,6 +344,11 @@ try {
   assert.equal(await page.locator('#draft-text').count(), 0, 'drafts are unavailable for draft estimates');
   await page.locator('[data-outcome="sent"]').click(); await page.locator('[data-confirm-ok]').click(); await toast(/Marked sent/);
   assert.equal((await state()).quotes.find(q => q.estimate_id === 'R-1007').next_follow_up_date, addDays(today, 3));
+  // Sprint 4A: a decision with no logged contact says Follow-up Results won't count it, before anything is saved.
+  await page.locator('[data-outcome="lost"]').click();
+  assert.match(await page.locator('#confirm-body').innerText(), /No contact is logged for this estimate, so Follow-up Results won’t count this/);
+  await page.locator('[data-confirm-cancel]').click();
+  assert.equal((await state()).quotes.find(q => q.estimate_id === 'R-1007').status, 'sent', 'cancel records nothing');
   await page.locator('[data-outcome="optout"]').click(); await page.locator('[data-confirm-ok]').click(); await toast(/Follow-ups stopped/);
   assert.equal(await page.locator('#draft-text').count(), 0, 'opt-out pauses drafts');
   current = await state();

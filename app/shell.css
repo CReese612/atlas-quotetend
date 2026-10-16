@@ -218,6 +218,7 @@ details.calc-notes ul { margin: 0; padding: 0 22px 16px 38px; display: grid; gap
 .count-chips .qt-chip.is-bad { background: #fbf1ec; border-color: #ead7c9; color: var(--clay-700); }
 .qt-import-row small { white-space: normal; overflow: visible; }
 .qt-import-row small.is-warning { color: #6b4d16; }
+.qt-import-row small.is-note { color: var(--text-3); }
 .qt-import-row__status { white-space: nowrap; }
 .import-block { display: grid; gap: 6px; }
 .import-block ul { margin: 4px 0 0; padding-left: 1.2em; }

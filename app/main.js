@@ -4,7 +4,7 @@
 // recorded on the client alone, and copying a draft never records a contact.
 import { request, sendCommand, loadAccount, announceSessionChange } from '/app/api.js';
 import * as D from '/domain.js';
-import { inspectSpreadsheet, statusesFor, previewSpreadsheet } from '/import-mapping.js';
+import { inspectSpreadsheet, statusesFor, statusSuggestions, previewSpreadsheet, looksDayMonthYear, FIELD_LABELS } from '/import-mapping.js';
 import { contactEvidence, contactsPerWeek } from '/results.js';
 import { esc, icon, wordmark, initials, money, plural, weekdayDate, shortDate, applySizes, detailHeader, factsAndJob, blockedNotice, draftPanel,
   contactForm, scheduleSection, outcomeSection, timeline } from '/app/ui.js';
@@ -25,7 +25,7 @@ let me = null, configuration = {}, ws = null, prefs = {};
 let busy = false;          // one command at a time; protects against double submission
 let blocked = null;        // { kind: 'stale' | 'session' } — further changes wait for a reload or sign-in
 let lastTrigger = null;
-const freshImport = () => ({ step: 'choose', name: '', sheet: null, mapping: null, options: { dateFormat: 'iso', defaultStatus: 'sent', statusMap: {}, optOutReviewed: false }, rows: null, revision: null, error: '', pasted: '', done: null });
+const freshImport = () => ({ step: 'choose', name: '', sheet: null, mapping: null, options: { dateFormat: 'iso', defaultStatus: 'sent', statusMap: {}, optOutReviewed: false, defaultFollowUp: '' }, rows: null, revision: null, error: '', pasted: '', done: null });
 const ui = { view: 'overview', query: '', status: 'all', followup: 'any', trade: 'all', sort: 'followup', limit: 100, queueLimit: 100, queue: 'due', range: 30, from: '', to: '', group: 'cohort',
   drawer: null, drafts: {}, contactValues: {}, draftStatus: '', draftOk: false, imp: freshImport() };
 const results = { key: '', data: null, weekly: null, error: '', request: 0 };
@@ -247,6 +247,10 @@ async function outcome(kind, button) {
     sent: { title: 'Mark this estimate sent?', body: `Use this once you have shared the estimate with ${q.customer_name}. It enters the follow-up queue with a first follow-up on ${weekdayDate(next)}; you can change the date afterward.`, confirm: 'Mark sent', done: `Marked sent. First follow-up ${weekdayDate(next)}.`, command: { kind: 'edit', estimateId: q.estimate_id, fields: { status: 'sent', next_follow_up_date: next } } },
     optout: { title: 'Stop follow-ups for this customer?', body: 'This estimate and any estimates sharing the same email leave every follow-up queue. Their follow-up dates are cleared and drafts are paused. Only remove an opt-out later after confirming the customer’s preference.', confirm: 'Do not contact', done: 'Follow-ups stopped for this customer.', tone: 'warn', command: { kind: 'edit', estimateId: q.estimate_id, fields: { do_not_contact: true } } }
   }[kind];
+  // Follow-up Results only counts a decision that follows a logged contact. Say so before the owner records one without
+  // any, so a decision reached on a follow-up call isn't silently left out (log the call first, then the decision).
+  if (['won', 'lost'].includes(kind) && !q.history.some(h => h.type === 'contact'))
+    copy.body += ' No contact is logged for this estimate, so Follow-up Results won’t count this as a decision after a follow-up. If it came out of a call or message, cancel and log that contact first.';
   if (!copy || !await confirmAction({ ...copy, focusCancel: kind === 'optout' })) return;
   if (await run(copy.command, { success: copy.done, button })) $('#drawer-title', drawer)?.focus();
 }
@@ -391,15 +395,13 @@ async function showSnapshots() {
 // ---------- Import ----------
 function guessDateFormat(sheet, mapping) {
   const cells = ['estimate_date', 'next_follow_up_date', 'last_contact_date'].filter(k => mapping[k] !== '').flatMap(k => sheet.rows.map(r => (r[Number(mapping[k])] || '').trim()));
-  return cells.some(c => /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(c)) ? 'mdy' : 'iso';
+  return cells.some(looksDayMonthYear) ? 'mdy' : 'iso';
 }
 function beginImport(text, name) {
   const imp = ui.imp;
   try {
     const sheet = inspectSpreadsheet(text), mapping = { ...sheet.mapping };
-    const synonyms = { accepted: 'won', declined: 'lost' };
-    const statusMap = Object.fromEntries(statusesFor(sheet, mapping).map(s => [s, D.STATUSES.includes(s.toLowerCase()) ? s.toLowerCase() : synonyms[s.toLowerCase()] || '']));
-    Object.assign(imp, { step: 'map', name, sheet, mapping, rows: null, error: '', options: { dateFormat: guessDateFormat(sheet, mapping), defaultStatus: 'sent', statusMap, optOutReviewed: false } });
+    Object.assign(imp, { step: 'map', name, sheet, mapping, rows: null, error: '', options: { dateFormat: guessDateFormat(sheet, mapping), defaultStatus: 'sent', statusMap: statusSuggestions(sheet, mapping), optOutReviewed: false, defaultFollowUp: '' } });
   } catch (error) { Object.assign(imp, { step: 'choose', error: error.message }); }
   render({ focus: true });
 }
@@ -425,7 +427,7 @@ async function commitImport(button) {
 function importReport() {
   const imp = ui.imp, blocks = D.importOptOutBlockers(imp.rows, ws.quotes);
   const text = (blocks.length ? 'IMPORT BLOCKED: an opt-out on a rejected or conflicting row would be lost. No data changed.\n' + blocks.map(b => `Row ${b.row}: ${b.email} (matching IDs: ${b.affectedIds.join(', ') || 'none'})`).join('\n') + '\n\n' : '')
-    + imp.rows.map(r => `Row ${r.row} | ${r.quote.estimate_id} | ${r.outcome}\n${[...r.errors, ...r.warnings].join('\n') || 'Ready to add'}`).join('\n\n');
+    + imp.rows.map(r => `Row ${r.row} | ${r.quote.estimate_id} | ${r.outcome}\n${[...r.errors, ...(r.differences || []).map(d => `${FIELD_LABELS[d.field]}: file "${d.file}", saved "${d.saved}"`), ...r.warnings].join('\n') || 'Ready to add'}`).join('\n\n');
   exportFile('quotetend-import-review.txt', text, 'text/plain;charset=utf-8', { title: 'Import validation report', description: `Every row in ${imp.name}, with the reason it will or will not be imported. Nothing has been imported.` });
 }
 async function readCSVFile(file) {
@@ -631,7 +633,7 @@ document.addEventListener('change', async event => {
   if (el.closest('[data-form="estimate"]') && ['status', 'do_not_contact'].includes(el.name)) return syncEditor();
   if (el.dataset.map) {
     ui.imp.mapping[el.dataset.map] = el.value; ui.imp.error = '';
-    if (el.dataset.map === 'status') ui.imp.options.statusMap = {};
+    if (el.dataset.map === 'status') ui.imp.options.statusMap = statusSuggestions(ui.imp.sheet, ui.imp.mapping);
     render(); return $(`[data-map="${el.dataset.map}"]`, main)?.focus();
   }
   if (el.dataset.importOption) {

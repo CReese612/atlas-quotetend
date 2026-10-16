@@ -281,10 +281,22 @@ export function supportingRows(r, group) {
 
 // ---------- Import preview ----------
 const OUTCOME_LABEL = { ready: 'Ready', existing: 'Duplicate · skipped', conflict: 'Existing ID · protected', held: 'Held · conflicting versions', repeat: 'Repeat · skipped', invalid: 'Invalid' };
+const DIFF_LABEL = { customer_name: 'Customer', customer_email: 'Email', job_description: 'Job', amount_usd: 'Amount', estimate_date: 'Estimate date', status: 'Status', next_follow_up_date: 'Next follow-up', last_contact_date: 'Last contact', do_not_contact: 'Opt-out', notes: 'Notes', customer_phone: 'Phone', address: 'Address', trade: 'Trade' };
+const diffValue = (field, v) => v === '' || v === undefined ? 'blank' : field === 'amount_usd' ? money(v) : field === 'do_not_contact' ? (v ? 'yes' : 'no')
+  : /_date$/.test(field) ? shortDate(v) : String(v).length > 40 ? String(v).slice(0, 37) + '…' : String(v);
+// Why a protected row was not imported, and what differs from the saved estimate (file value first).
+function protectedNote(r) {
+  const diffs = r.differences || [];
+  if (diffs.every(d => d.field === 'next_follow_up_date' || d.field === 'last_contact_date'))
+    return `<small class="is-note">Already in QuoteTend; only follow-up dates differ, which QuoteTend updates as you work and clears for opt-outs; nothing overwritten.</small>`;
+  return `<small class="is-warning">Differs from the saved estimate; nothing overwritten. ${esc(diffs.map(d => `${DIFF_LABEL[d.field]}: file ${diffValue(d.field, d.file)}, saved ${diffValue(d.field, d.saved)}`).join(' · '))}</small>`;
+}
 // `shared` lists warnings that apply to every row; they are shown once in the summary instead.
 export function importRowsList(rows, shared = []) {
   return `<ul class="qt-import-rows">${rows.map(r => { const warnings = r.warnings.filter(w => !shared.includes(w));
-    return `<li class="qt-import-row qt-import-row--${r.outcome}"><span class="qt-import-row__status">${icon(r.outcome === 'ready' ? 'checkCircle' : r.outcome === 'invalid' ? 'alert' : 'pause')}${esc(OUTCOME_LABEL[r.outcome])}</span><div><strong>${esc(r.quote.customer_name || '(no name)')}</strong><span>Row ${r.row} · ${esc(r.quote.estimate_id || '(no ID)')} · ${esc(r.quote.job_description)}</span>${r.errors.length ? `<small>${esc(r.errors.join('; '))}</small>` : warnings.length ? `<small class="is-warning">${esc(warnings.join('; '))}</small>` : ''}</div><span class="qt-num">${Number.isFinite(r.quote.amount_usd) ? money(r.quote.amount_usd) : '—'}</span></li>`; }).join('')}</ul>`;
+    const detail = r.outcome === 'conflict' ? protectedNote(r) : ['existing', 'repeat'].includes(r.outcome) ? `<small class="is-note">${esc(r.errors.join('; '))}</small>`
+      : r.errors.length ? `<small>${esc(r.errors.join('; '))}</small>` : warnings.length ? `<small class="is-warning">${esc(warnings.join('; '))}</small>` : '';
+    return `<li class="qt-import-row qt-import-row--${r.outcome}"><span class="qt-import-row__status">${icon(r.outcome === 'ready' ? 'checkCircle' : r.outcome === 'invalid' ? 'alert' : 'pause')}${esc(OUTCOME_LABEL[r.outcome])}</span><div><strong>${esc(r.quote.customer_name || '(no name)')}</strong><span>Row ${r.row} · ${esc(r.quote.estimate_id || '(no ID)')} · ${esc(r.quote.job_description)}</span>${detail}</div><span class="qt-num">${Number.isFinite(r.quote.amount_usd) ? money(r.quote.amount_usd) : '—'}</span></li>`; }).join('')}</ul>`;
 }
 
 export const panel = (title, desc, body, { action = '', cls = '', bodyCls = 'qt-panel__body', label = '' } = {}) =>

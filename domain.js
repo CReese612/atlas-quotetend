@@ -6,6 +6,9 @@ export const LEGACY_COLUMNS = ['estimate_id', 'customer_name', 'customer_email',
 export const OPTIONAL_FIELDS = ['customer_phone', 'address', 'trade'];
 export const FIELD_LIMITS = { customer_phone: 40, address: 300, trade: 80 };
 export const CSV_COLUMNS = [...LEGACY_COLUMNS, ...OPTIONAL_FIELDS];
+// Fields QuoteTend itself changes as the owner logs contacts and schedules follow-ups. A re-imported spreadsheet that
+// differs from a saved estimate only here is usually just behind QuoteTend, not a revision of the estimate.
+export const FOLLOWUP_FIELDS = ['next_follow_up_date', 'last_contact_date'];
 // Suggestions only: contractors may enter any trade or service category.
 export const TRADES = ['Roofing', 'Siding', 'Windows & doors', 'Gutters', 'Exterior remodel'];
 export const CHANNELS = ['Email', 'Phone', 'Text', 'Other'];
@@ -114,10 +117,13 @@ export function metrics(quotes, today = todayISO()) {
   const won = quotes.filter(q => q.status === 'won'), blocks = optOutBlocks(quotes);
   return { openValue: open.reduce((s, q) => s + q.amount_usd, 0), openCount: open.length, dueCount: quotes.filter(q => due(q, today, blocks)).length, wonValue: won.reduce((s, q) => s + q.amount_usd, 0), wonCount: won.length, unscheduled: quotes.filter(q => eligible(q, blocks) && !q.next_follow_up_date).length };
 }
+// Whole-dollar amounts read as "$21,480", not "$21,480.00". Only the job's first letter is lowered, and only when it
+// starts an ordinary word, so names and acronyms the owner typed ("HOA", "Building C", "GAF") stay as written.
+export const draftAmount = n => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 }).format(n);
+export const draftJob = job => job.trim().replace(/^[A-Z](?=[a-z])/, c => c.toLowerCase());
 export function draftMessage(q, company = 'Brush & Pine Painting', quotes = [q]) {
   if (!eligible(q, quotes)) throw new Error('Follow-up drafts are only available for sent estimates without an estimate or shared-email opt-out.');
-  const amount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(q.amount_usd);
-  return `Hi ${q.customer_name.split(' ')[0]},\n\nI wanted to check in on the ${amount} estimate for ${q.job_description.toLowerCase()}. Have you had a chance to look it over?\n\nIf you have any questions or would like to discuss next steps, just let me know. Happy to help.\n\nThanks,\n${company}`;
+  return `Hi ${q.customer_name.split(' ')[0]},\n\nI wanted to check in on the ${draftAmount(q.amount_usd)} estimate for ${draftJob(q.job_description)}. Have you had a chance to look it over?\n\nIf you have any questions or would like to discuss next steps, just let me know. Happy to help.\n\nThanks,\n${company}`;
 }
 export function recordContact(q, { date, nextDate, note, channel, result }, today = todayISO(), quotes = [q]) {
   if (!eligible(q, quotes)) throw new Error('Contact logging is paused for this estimate or shared email.');
@@ -164,7 +170,8 @@ export function previewImport(text, existing = []) {
     if (!eligible(q) && q.next_follow_up_date) warnings.push('Follow-up date will be cleared for draft, closed, or opted-out estimate');
     return { row: index + 2, quote: normalize(q), original: q, errors, warnings, outcome: errors.length ? 'invalid' : 'ready' };
   });
-  const signature = q => JSON.stringify(CSV_COLUMNS.map(k => k === 'estimate_id' ? q[k].trim().toLowerCase() : typeof (q[k] ?? '') === 'string' ? (q[k] ?? '').trim() : q[k]));
+  const comparable = (q, k) => k === 'estimate_id' ? q[k].trim().toLowerCase() : typeof (q[k] ?? '') === 'string' ? (q[k] ?? '').trim() : q[k];
+  const signature = q => JSON.stringify(CSV_COLUMNS.map(k => comparable(q, k)));
   const key = q => q.estimate_id.trim().toLowerCase();
   const groups = new Map();
   for (const r of result.filter(r => !r.errors.length)) { const id = key(r.quote); if (!groups.has(id)) groups.set(id, []); groups.get(id).push(r); }
@@ -174,9 +181,14 @@ export function previewImport(text, existing = []) {
     const hasConflict = new Set(group.map(r => signature(r.original))).size > 1;
     for (const [index, row] of group.entries()) {
       if (old) {
-        const same = signature(normalize(row.original)) === signature(normalize(old));
+        const file = normalize(row.original), saved = normalize(old);
+        const same = signature(file) === signature(saved);
         row.outcome = same ? 'existing' : 'conflict';
         row.errors.push(same ? 'Duplicate estimate ID — exact existing match; skipped' : 'Duplicate estimate ID — conflicts with an existing estimate; nothing overwritten');
+        // What differs, so the owner can tell a real revision in the source from activity QuoteTend recorded since.
+        // Informational only: the saved estimate is never changed by an import.
+        if (!same) row.differences = CSV_COLUMNS.filter(k => k !== 'estimate_id' && JSON.stringify(comparable(file, k)) !== JSON.stringify(comparable(saved, k)))
+          .map(field => ({ field, file: file[field], saved: saved[field] }));
       } else if (hasConflict) {
         row.outcome = 'held'; row.errors.push('Conflicting versions of this estimate ID in this file — all versions held. Correct the source file and preview again.');
       } else if (index > 0) {
