@@ -1,5 +1,7 @@
 # Product brief and decisions
 
+> **Current positioning (Sprint 4A, October 2026):** estimate follow-up for small roofing and exterior contractors in Eugene/Lane County, Oregon. The painting-contractor audience, the Columbia, Missouri research area and the $19/month figure below are historical decisions, kept for the record. Demand, willingness to pay and pricing remain unvalidated; see [SPRINT4A_CONTRACTOR_VALUE.md](SPRINT4A_CONTRACTOR_VALUE.md).
+
 Source: the user's **Check ChatGPT access** task, read September 16, 2026.
 
 QuoteTend is the working company/product name. Description: estimate follow-up software for contractors. Tagline: Keep every estimate moving.

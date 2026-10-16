@@ -1,5 +1,7 @@
 # QuoteTend launch readiness — September 18, 2026
 
+> **Sprint 4A note (October 2026):** this checklist is unchanged and still not passed. Sprint 4A separates four gates: product/demo readiness (ready for discovery calls with fictional data), customer-validation readiness (kit ready, no conversations yet), technical production readiness (not ready, below) and real-data/payment readiness (not ready). See [SPRINT4A_CONTRACTOR_VALUE.md §8](docs/SPRINT4A_CONTRACTOR_VALUE.md#8-paid-pilot-recommendation). Since Sprint 3A the business calendar is Oregon (America/Los_Angeles) regardless of server zone, so the "Central Time pilot limitation" below is historical.
+
 **Local launch preparation is complete. QuoteTend is NOT yet ready to accept a real paying customer.** Required external setup and live checks have not passed. No messages, provider connections, purchases, deployments or payments occurred.
 
 Launch scope: organize estimates, schedule follow-ups, prepare editable drafts, record owner-reported contacts/outcomes and show conservative results. No automatic customer messaging or causal revenue claims.

@@ -1,5 +1,7 @@
 # Start here: QuoteTend
 
+> **Sprint 4A (October 2026):** the current target is small roofing and exterior contractors in Eugene/Lane County, Oregon. For discovery calls, use the [roofing discovery kit](docs/interviews/INTERVIEW_KIT.md) and its five-minute demo script on the public demo; the findings and pilot recommendation are in [SPRINT4A_CONTRACTOR_VALUE.md](docs/SPRINT4A_CONTRACTOR_VALUE.md). The painting examples and Columbia, Missouri candidates further down are historical. No contractor has been interviewed yet.
+
 Sprint 2 rebuilt the private business application on the public demo's design. It is ready for fictional practice and owner acceptance testing (see [docs/SPRINT2_PRIVATE_APP.md](docs/SPRINT2_PRIVATE_APP.md)). The Follow-up Results milestone passed automated and browser checks on September 18, 2026. No contractor interviews or customer demand have been validated. Grok is not needed to continue.
 
 For the current paid-customer preparation, read [LAUNCH_READINESS](LAUNCH_READINESS.md). After signing in, open **Account security** and save a recovery code. No email reset is sent. [Offer proposals](docs/PAID_PILOT_OFFER_DRAFT.md) and [operations](docs/LAUNCH_OPERATIONS.md) are prepared; nothing is deployed or connected.
@@ -36,6 +38,8 @@ Use the [pilot baseline worksheet](docs/interviews/PILOT_BASELINE.md) and [resul
 
 ## Five-minute demo
 
+*Historical (September 2026, painting example in the private app). For roofing conversations use the demo script in the [discovery kit](docs/interviews/INTERVIEW_KIT.md#five-minute-demo-script-optional-after-discovery), which runs on the public Fernbrook Roofing demo.*
+
 Prepare before the conversation: add **Jordan Example**, `jordan.example@example.com`, fictional hallway painting, $1,250, Sent, estimate date today and follow-up today. Use a fresh fictional name/email if already present. Stage the small CSV example from the [import guide](docs/IMPORT_GUIDE.md) if you want to show mapping. Date examples in that guide are fixed; adapt them before the demo.
 
 | Time | Action and explanation |
@@ -49,6 +53,8 @@ Prepare before the conversation: add **Jordan Example**, `jordan.example@example
 Use the demo only after asking about the contractor's actual process. Skip import if it is irrelevant or time runs out. Save backup/restore testing for your preparation, not the five-minute presentation. Native file selection was slow in the automated browser rehearsal.
 
 ## First three interviews
+
+*Historical checklist (painting, Columbia, Missouri). The current checklist is "After three conversations" in the [roofing discovery kit](docs/interviews/INTERVIEW_KIT.md#after-three-conversations); do not contact the painting candidates below as part of the current research.*
 
 - [ ] Run the [10-minute self-test](docs/FIRST_USER_TEST.md) once; note confusing steps.
 - [ ] Review the [draft invitations](docs/interviews/OUTREACH_DRAFTS.md). Starting candidates: Dave's Painting, TigerStripe Painting and Ai Painting Plus. These are research candidates, not interested customers; verify current public contact details before deciding to contact them manually. Nothing has been sent.

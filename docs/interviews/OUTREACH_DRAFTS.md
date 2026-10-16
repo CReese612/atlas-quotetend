@@ -1,5 +1,7 @@
 # Interview invitations — drafts only
 
+> **Sprint 4A (October 2026): the candidates and emails below are historical.** They were written for painting contractors in Columbia, Missouri. The current research target is small roofing and exterior contractors in Eugene/Lane County, Oregon. Do not use these candidates as an outreach list. An unaddressed roofing template is at the [end of this file](#current-template--roofing-and-exterior-eugenelane-county-unaddressed). Nothing has been sent to anyone.
+
 No messages or calls have been sent. The user will decide whom to contact and manually review/send any invitation. Business contact: **quotetend@gmail.com**. Replace `[Your name]` before use. These are workflow research requests, not requests for a painting quote.
 
 ## Candidate order and what remains unknown
@@ -71,3 +73,19 @@ QuoteTend · quotetend@gmail.com
 “Hi, I'm [Your name] in Columbia. I'm calling about research, not to request painting work. I'm building an early prototype called QuoteTend and learning how painters track estimates after sending them. Is there a good time for a 15-minute conversation with the person who handles that?”
 
 If busy: offer to end the call and let them suggest a time. If declined: thank them and record no further contact. If they request contact details, provide quotetend@gmail.com. Do not claim customers, results, integrations, or a settled price.
+
+## Current template — roofing and exterior, Eugene/Lane County (unaddressed)
+
+Draft only, written in Sprint 4A. No business has been selected, researched or contacted for this template. The founder decides whether and whom to contact, verifies public contact details first, and sends anything manually. Keep price out of the invitation.
+
+Subject: 15 minutes about what happens after a roofing estimate?
+
+Hi [business name] team,
+
+I'm [Your name], here in [Eugene / Lane County]. I'm building an early tool called QuoteTend for keeping track of estimates after they're sent, and I'd like to learn how roofing and exterior contractors handle that today, including what already works well. Would the person who handles estimate follow-up have 15 minutes for a conversation? This is research: there's nothing to buy or set up, and no customer information is needed.
+
+Thanks,
+[Your name]
+QuoteTend · quotetend@gmail.com
+
+Phone version: "Hi, I'm [Your name], local, calling about research, not to request a roof. I'm learning how roofing companies keep track of estimates after they send them. Is there a better time for a 15-minute conversation with whoever handles that?" If they decline, thank them and record no further contact. Do not claim customers, results, integrations or a price.

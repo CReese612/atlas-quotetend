@@ -8,7 +8,44 @@ Blank working template. No invitations sent, interviews completed, or customer i
 | | | | | | |
 | | | | | | |
 
-## Copy this section per interview
+## Structured notes per conversation (Sprint 4A, roofing and exterior)
+
+Copy this block for each conversation. Keep the five kinds of record apart; a line belongs in only one. Write "unknown" rather than guessing. Leave out customer names, addresses and contact details.
+
+```text
+Conversation ID / date / length:
+Business type and size (as stated) / participant role:
+Notes permission (written only):
+Demo shown? yes/no — which screens:
+
+1. CONTRACTOR-STATED BEHAVIOR (what they say they do)
+   - Estimating and storage tools:
+   - Who follows up, when, by which channel:
+   - How they know who to call:
+   - Export: format / columns / estimate numbers? (as described)
+   - Open estimates at a time (their estimate, not a count):
+   - Last slipped estimate: when, approximate value, what happened (their recollection):
+
+2. DIRECTLY OBSERVED BEHAVIOR (what you saw them do or show)
+   - Screens or lists they showed:
+   - Demo tasks: completed alone / with help / failed / not attempted, and where they hesitated:
+   - Unprompted questions they asked:
+
+3. VERBATIM STATEMENTS (exact words only, in quotes)
+   -
+
+4. FOUNDER INTERPRETATION (what you think it means; mark it as yours)
+   -
+
+5. UNVERIFIED HYPOTHESES (what to test next; who could disconfirm it)
+   -
+
+Evidence of intent reached (see PAID_PILOT_OFFER_DRAFT.md evidence ladder): none / showed real workflow / agreed second session [date] / onboarding date [date] / accepted pilot terms / committed to pay
+Contrary evidence (reasons this business would not adopt or pay):
+Agreed next action and date (only what they agreed to):
+```
+
+## Copy this section per interview (September 2026 template, still usable)
 
 - Interview ID/date:
 - Business and participant role (as stated):

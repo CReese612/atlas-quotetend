@@ -15,6 +15,13 @@ Ask about the last actual estimates before showing the demo:
 5. What work does follow-up involve each week? What is forgotten or duplicated? Record examples and contrary evidence, not just complaints.
 6. During the pilot, will job size, lead sources, seasonality, staffing, pricing or other marketing change? What could explain different outcomes besides QuoteTend?
 
+Roofing and exterior additions (Sprint 4A, Eugene/Lane County target):
+
+7. Which estimates are insurance claims, and how does the adjuster's timeline change when follow-up makes sense? Keep claim and retail estimates separate in the baseline.
+8. How do rainy-season scheduling, storm events and material lead times change estimate volume and decision time during the baseline period versus the pilot?
+9. Is "won" a signed contract, a deposit, a scheduled install, or an approved insurance scope? Use one definition for both periods.
+10. Do repairs and full replacements get followed up the same way? Report them separately if not.
+
 | Baseline item | Value / unknown | Source | Evidence quality / missing coverage |
 |---|---|---|---|
 | Estimates sent: count / value | | | |
