@@ -70,9 +70,9 @@ const counts = { estimates: quotes.length, due: m.dueCount };
 const windowBar = title => `<div class="window-bar"><span class="dots"><i></i><i></i><i></i></span><span class="window-title">${esc(title)}</span><span class="window-tag">Fictional demo data</span></div>`;
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
 
-// Previews marked data-core (the Features page) show only what the customer app has today, so they
-// leave out the demo's planned-feature extras: trade tags, the trade and follow-up filters and the
-// pipeline-by-state chart.
+// Previews marked data-core (the Features page) keep the conservative subset drawn before the Sprint 2
+// customer app: they leave out trade tags, the trade and follow-up filters and the pipeline-by-state
+// chart. The customer app now has all of these; the previews simply show less.
 const overviewWindow = core => {
   const overdue = q.due.filter(x => x.next_follow_up_date < today).length;
   return `<div class="window qt">${windowBar(`Overview · ${COMPANY.name}`)}<div class="window-body">${previewSidebar('overview', counts)}
@@ -119,7 +119,7 @@ const shots = {
   overview() { return overviewWindow(true); },
 
   estimates(core) {
-    // The customer app searches customer, job, estimate ID and email; the demo also searches its planned fields.
+    // The core preview searches customer, job, estimate ID and email only (the customer app also searches phone, address, trade and notes).
     const list = filterEstimates(quotes, { query: 'roof', sort: 'followup' }, today)
       .filter(x => !core || `${x.customer_name} ${x.job_description} ${x.estimate_id} ${x.customer_email}`.toLowerCase().includes('roof'));
     const value = list.filter(x => x.status === 'sent').reduce((s, x) => s + x.amount_usd, 0);

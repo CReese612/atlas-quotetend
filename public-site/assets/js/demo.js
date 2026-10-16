@@ -96,7 +96,7 @@ const views = {
         </div>
       </div>
       <div class="grid-2">
-        ${panel('Recent follow-up activity', 'Contacts and outcomes recorded by your team', `<ol class="qt-feed">${recentActivity(state, 7).map(a => activityItem(a, today)).join('')}</ol>`, { bodyCls: '' })}
+        ${panel('Recent follow-up activity', 'Contacts and outcomes recorded in this workspace', `<ol class="qt-feed">${recentActivity(state, 7).map(a => activityItem(a, today)).join('')}</ol>`, { bodyCls: '' })}
         ${panel('Recorded outcomes', 'Current status of closed estimates', `<div class="outcome-split"><div class="won"><span>Won</span><strong>${money(st.won.value)}</strong><small>${plural(st.won.count, 'estimate')}</small></div><div><span>Lost</span><strong>${money(st.lost.value)}</strong><small>${plural(st.lost.count, 'estimate')}</small></div></div>
           <p class="qt-help">Won values are recorded estimate amounts, not collected revenue.</p>`, { action: `<a class="panel-link" href="#results">Follow-up Results ${icon('arrowRight')}</a>` })}
       </div>`;
@@ -133,7 +133,7 @@ const views = {
 
   results() {
     const r = resultsForRange(state, ui.range, today);
-    return `<div class="view-head"><div><p class="qt-eyebrow">Reporting</p><h1 tabindex="-1">Follow-up Results</h1><p class="sub">What your team recorded from ${esc(shortDate(r.from))} to ${esc(shortDate(r.to))}: contacts, follow-ups and outcomes.</p></div>
+    return `<div class="view-head"><div><p class="qt-eyebrow">Reporting</p><h1 tabindex="-1">Follow-up Results</h1><p class="sub">What was recorded from ${esc(shortDate(r.from))} to ${esc(shortDate(r.to))}: contacts, follow-ups and outcomes.</p></div>
         <div class="qt-seg-ctl" role="group" aria-label="Date range">${[7, 30, 90].map(d => `<button type="button" data-range="${d}" aria-pressed="${ui.range === d}">Last ${d} days</button>`).join('')}</div></div>
       <div class="qt-notice qt-notice--gold">${icon('info')}<p><strong>Recorded sequence, not proof of caused revenue.</strong> Contacts are owner-reported. QuoteTend sends nothing and verifies no delivery or payment. Values are estimate amounts, not collected revenue.</p></div>
       <div data-tour="results">${resultCards(r, { selected: ui.group })}</div>
@@ -295,7 +295,7 @@ async function copyDraft() {
   let ok = false;
   try { await navigator.clipboard.writeText(ta.value); ok = true; } catch { /* fall back below */ }
   if (!ok) { ta.focus(); ta.select(); try { ok = document.execCommand('copy'); } catch { ok = false; } }
-  setDraftStatus(ok ? 'Draft copied to your clipboard. Nothing was sent and no contact was recorded — paste it into your own email or text app.'
+  setDraftStatus(ok ? 'Draft copied to your clipboard. Nothing was sent and no contact was recorded — paste it into your own email or text app, then log the contact once it happens.'
     : 'Your browser blocked copying. The draft is selected — press Ctrl+C (or ⌘C) to copy it. Nothing was sent.', ok);
   toast(ok ? 'Draft copied. Nothing was sent.' : 'Copy blocked — draft selected instead.', { error: !ok });
 }
@@ -332,6 +332,9 @@ async function outcome(kind) {
     lost: { title: 'Mark this estimate lost?', body: `This records ${q.customer_name}’s ${money(q.amount_usd)} estimate as lost and clears its follow-up date. The activity history is kept.`, confirm: 'Mark lost', done: 'Estimate marked lost. It has left the follow-up queues.' },
     optout: { title: 'Stop follow-ups for this customer?', body: 'This estimate and any estimates sharing the same email leave every follow-up queue. Their follow-up dates are cleared and drafts are paused.', confirm: 'Do not contact', done: 'Follow-ups stopped for this customer.', tone: 'warn' }
   }[kind];
+  // Same note as the customer app: Follow-up Results only counts a decision that follows a logged contact.
+  if (['won', 'lost'].includes(kind) && !q.history.some(h => h.type === 'contact'))
+    copy.body += ' No contact is logged for this estimate, so Follow-up Results won’t count this as a decision after a follow-up. If it came out of a call or message, cancel and log that contact first.';
   if (!await confirmAction({ ...copy, focusCancel: kind === 'optout' })) return;
   try {
     if (ui.tour !== null && q.estimate_id === FOCUS_ID) { ui.loggedExample = true; persistTour(); }

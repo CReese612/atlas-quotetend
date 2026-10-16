@@ -54,12 +54,12 @@ export const STEPS = [
     body: c => c.loggedExample
       ? `Recorded. ${esc(c.focus?.first || 'The customer')}’s estimate is now ${esc(c.focus?.timing || 'updated')}, and the call is saved in the activity history. When the homeowner decides, use <strong>Mark won</strong> or <strong>Mark lost</strong> below.`
       : `After the conversation, log what happened and when to check back. The estimate moves out of the overdue queue and its history is kept. When ${esc(c.focus?.first || 'the homeowner')} decides, record won or lost.`,
-    why: 'A complete record means anyone on your team can pick up the conversation where it left off.',
+    why: 'The history keeps every logged call, so the next conversation starts where this one left off.',
     action: { label: c => c.loggedExample ? 'Example call recorded' : 'Record an example phone call', run: 'log-example', done: c => !!c.loggedExample }
   },
   {
     id: 'report', title: 'Review reporting', view: 'results', target: '[data-tour="results"]',
-    body: c => `Follow-up Results is built only from what your team records: <strong>${plural(c.r.counts.contacts, 'contact')}</strong> logged in the last ${c.range} days across <strong>${plural(c.r.counts.followed, 'estimate')}</strong>, with <strong>${money(c.r.values.won)}</strong> won after a recorded follow-up.${c.loggedExample ? ' Your example call is already counted.' : ''}`,
+    body: c => `Follow-up Results is built only from what you record: <strong>${plural(c.r.counts.contacts, 'contact')}</strong> logged in the last ${c.range} days across <strong>${plural(c.r.counts.followed, 'estimate')}</strong>, with <strong>${money(c.r.values.won)}</strong> won after a recorded follow-up.${c.loggedExample ? ' Your example call is already counted.' : ''}`,
     why: 'Values are estimate amounts — not collected revenue, and not proof that QuoteTend caused a sale.'
   }
 ];
@@ -69,7 +69,7 @@ export function tourCard(index, ctx, { interactive = true, minimized = false, pa
   if (index >= total) {
     return `<section class="qt-tour qt-tour--done" aria-labelledby="tour-title"><div class="qt-tour__top"><span class="qt-tour__step">${icon('checkCircle')}Tour complete</span><button class="qt-icon-btn" type="button" data-tour-act="exit" aria-label="Close guided tour">${icon('x')}</button></div>
       <h2 class="qt-tour__title" id="tour-title" tabindex="-1">That’s the core workflow.</h2>
-      <p class="qt-tour__body">You found the money waiting in open estimates, picked the customer who needed attention, prepared a follow-up, recorded what happened and saw it reflected in reporting.</p>
+      <p class="qt-tour__body">You saw the estimate value still awaiting a decision, picked the customer who needed attention, prepared a follow-up, recorded what happened and saw it reflected in reporting.</p>
       <div class="qt-tour__finish"><button class="qt-btn qt-btn--primary" type="button" data-tour-act="exit">Explore on your own</button><button class="qt-btn" type="button" data-tour-act="restart">${icon('reset')}Restart tour</button><button class="qt-btn qt-btn--ghost" type="button" data-tour-act="reset-data">Reset demo data</button></div>
       <a class="qt-tour__cta" href="index.html#early-access">Interested in early access? ${icon('arrowRight')}</a></section>`;
   }

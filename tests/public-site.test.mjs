@@ -77,9 +77,11 @@ test('copy stays honest: no unsupported claims, placeholders or private referenc
   }
   assert.doesNotMatch(text, /shows exactly how QuoteTend works today|is in early access\.|Product in early access/, 'implies the product is already in early access or that the demo is exact');
   assert.match(pages['features.html'], /CSV export and workspace backups/);
-  assert.match(pages['features.html'], /Phone numbers, street addresses and trade tags appear in the demo as previews of planned customer-app fields/);
-  assert.match(pages['index.html'], /previews a few conveniences planned for the customer app/);
-  assert.match(await read('demo.html'), /preview planned customer-app features/);
+  // Sprint 4A: phone, address and trade shipped in the Sprint 2 customer app, so they are no longer described as planned.
+  assert.match(pages['features.html'], /Phone numbers, project addresses and trade tags are optional fields on every estimate, in the customer app and the demo/);
+  assert.match(pages['index.html'], /trade tags, street and phone details, and charts are part of the customer app too/);
+  assert.match(await read('demo.html'), /Phone, street and trade details are optional fields in the customer app too/);
+  assert.doesNotMatch(text, /planned customer-app|planned for the customer app|anyone on your team/, 'no outdated planned-feature disclosure or multi-user claim');
   // The distinctions the owner requires: a draft is not a sent message, contact happens outside
   // QuoteTend, and a recorded win is not proof QuoteTend caused the sale.
   const how = pages['how-it-works.html'];
